@@ -8,6 +8,7 @@ package main;
 import de.javasoft.plaf.synthetica.SyntheticaBlackEyeLookAndFeel;
 import java.awt.Cursor;
 import java.awt.Desktop;
+import java.awt.event.KeyEvent;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -24,8 +25,13 @@ import java.text.ParseException;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.regex.Matcher;
+import javax.swing.RowFilter;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableModel;
+import javax.swing.table.TableRowSorter;
 import net.proteanit.sql.DbUtils;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.binary.Hex;
@@ -81,10 +87,20 @@ public class FrmMain extends javax.swing.JFrame {
             Connection conn = DriverManager.getConnection("jdbc:relique:csv:" + System.getProperty("user.dir"), props);
             Statement stmt = conn.createStatement();
             //ResultSet results = stmt.executeQuery("SELECT * FROM dump WHERE \"#ADDED\"='2011-Sep-08 05:09:05';");
-            ResultSet results = stmt.executeQuery("SELECT * FROM dump WHERE " + ready + " LIMIT 10000;");
+            ResultSet results = stmt.executeQuery("SELECT * FROM dump WHERE " + ready + " LIMIT 20000;");
             
             tblTorrents.setModel(DbUtils.resultSetToTableModel(results));
+            tblTorrents.getColumnModel().removeColumn(tblTorrents.getColumnModel().getColumn(1));
+            tblTorrents.getColumnModel().getColumn(0).setHeaderValue("Date Added");
+            tblTorrents.getColumnModel().getColumn(1).setHeaderValue("Torrent Name");
+            tblTorrents.getColumnModel().getColumn(2).setHeaderValue("Torrent Size");
             
+            tblTorrents.getColumnModel().getColumn(0).setMaxWidth(200);
+            tblTorrents.getColumnModel().getColumn(0).setPreferredWidth(200);
+            tblTorrents.getColumnModel().getColumn(2).setMaxWidth(100);
+            tblTorrents.getColumnModel().getColumn(2).setPreferredWidth(100);
+            
+            formatSizes();
 //            while (results.next()) {
 //                System.out.println(results.getString(3));
 //            }
@@ -134,6 +150,29 @@ public class FrmMain extends javax.swing.JFrame {
         }
     }
     
+    private void formatSizes(){
+        
+        int count = tblTorrents.getModel().getRowCount();
+        for (int row = 0; row < count; row++) {
+            String val_string = (String) tblTorrents.getModel().getValueAt(row, 3);
+            //System.out.println(row);
+            Long val = Long.parseLong(val_string);
+            String fin_val = humanReadableByteCount(val, false);
+            tblTorrents.getModel().setValueAt(fin_val, row, 3);
+        }
+
+    }
+
+    public static String humanReadableByteCount(long bytes, boolean si) {
+        int unit = si ? 1000 : 1024;
+        if (bytes < unit) {
+            return bytes + " B";
+        }
+        int exp = (int) (Math.log(bytes) / Math.log(unit));
+        String pre = (si ? "kMGTPE" : "kMGTPE").charAt(exp - 1) + (si ? "" : "");
+        return String.format("%.1f %sB", bytes / Math.pow(unit, exp), pre);
+    }
+
     private void magnet(){
         String guid = "4QQSPpi9goBxPIOrcbDuurFQwBs=";
         byte[] decoded = Base64.decodeBase64(guid);
@@ -165,6 +204,8 @@ public class FrmMain extends javax.swing.JFrame {
         jPanel2 = new javax.swing.JPanel();
         chkSS = new javax.swing.JCheckBox();
         filler1 = new javax.swing.Box.Filler(new java.awt.Dimension(0, 0), new java.awt.Dimension(0, 0), new java.awt.Dimension(32767, 0));
+        jLabel4 = new javax.swing.JLabel();
+        txtFilter = new javax.swing.JTextField();
         jPanel1 = new javax.swing.JPanel();
         jLabel3 = new javax.swing.JLabel();
         jSeparator1 = new javax.swing.JSeparator();
@@ -177,10 +218,10 @@ public class FrmMain extends javax.swing.JFrame {
         pnlMain.setLayout(new java.awt.GridBagLayout());
 
         txtSearch.setFont(new java.awt.Font("Dialog", 0, 14)); // NOI18N
-        txtSearch.setText("   big       bang    ");
-        txtSearch.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                txtSearchActionPerformed(evt);
+        txtSearch.setText("\"bright\"");
+        txtSearch.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyTyped(java.awt.event.KeyEvent evt) {
+                txtSearchKeyTyped(evt);
             }
         });
         gridBagConstraints = new java.awt.GridBagConstraints();
@@ -299,11 +340,32 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints.anchor = java.awt.GridBagConstraints.LINE_START;
         jPanel2.add(chkSS, gridBagConstraints);
         gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridx = 4;
         gridBagConstraints.gridy = 0;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.weightx = 0.1;
+        gridBagConstraints.weightx = 1.0;
         jPanel2.add(filler1, gridBagConstraints);
+
+        jLabel4.setText("Filter:");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.insets = new java.awt.Insets(0, 9, 0, 0);
+        jPanel2.add(jLabel4, gridBagConstraints);
+
+        txtFilter.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                txtFilterKeyReleased(evt);
+            }
+        });
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 2;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.ipady = 10;
+        gridBagConstraints.weightx = 0.2;
+        gridBagConstraints.insets = new java.awt.Insets(0, 3, 0, 0);
+        jPanel2.add(txtFilter, gridBagConstraints);
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
@@ -347,10 +409,6 @@ public class FrmMain extends javax.swing.JFrame {
         pack();
     }// </editor-fold>//GEN-END:initComponents
 
-    private void txtSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_txtSearchActionPerformed
-        // TODO add your handling code here:
-    }//GEN-LAST:event_txtSearchActionPerformed
-
     private void btnSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSearchActionPerformed
         search(txtSearch.getText());
     }//GEN-LAST:event_btnSearchActionPerformed
@@ -372,6 +430,21 @@ public class FrmMain extends javax.swing.JFrame {
     private void btnCpyTitleActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnCpyTitleActionPerformed
         
     }//GEN-LAST:event_btnCpyTitleActionPerformed
+
+    private void txtFilterKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtFilterKeyReleased
+
+        TableRowSorter<TableModel> sorter = new TableRowSorter<>(((DefaultTableModel) tblTorrents.getModel()));
+        sorter.setRowFilter(RowFilter.regexFilter("(?i)" + Matcher.quoteReplacement(txtFilter.getText())));
+        tblTorrents.setRowSorter(sorter);
+
+    }//GEN-LAST:event_txtFilterKeyReleased
+
+    private void txtSearchKeyTyped(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtSearchKeyTyped
+        char c = evt.getKeyChar();
+        if (c == KeyEvent.VK_ENTER) {
+            search(txtSearch.getText());
+        }
+    }//GEN-LAST:event_txtSearchKeyTyped
 
     /**
      * @param args the command line arguments
@@ -410,6 +483,7 @@ public class FrmMain extends javax.swing.JFrame {
     protected javax.swing.JLabel jLabel1;
     protected javax.swing.JLabel jLabel2;
     protected javax.swing.JLabel jLabel3;
+    protected javax.swing.JLabel jLabel4;
     protected javax.swing.JMenuBar jMenuBar1;
     protected javax.swing.JMenuItem jMenuItem1;
     protected javax.swing.JPanel jPanel1;
@@ -419,6 +493,7 @@ public class FrmMain extends javax.swing.JFrame {
     protected javax.swing.JMenu mnuTools;
     protected javax.swing.JPanel pnlMain;
     protected javax.swing.JTable tblTorrents;
+    protected javax.swing.JTextField txtFilter;
     protected javax.swing.JTextField txtSearch;
     // End of variables declaration//GEN-END:variables
 }
