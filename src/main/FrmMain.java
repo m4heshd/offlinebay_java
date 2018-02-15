@@ -5,6 +5,23 @@
  */
 package main;
 
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.PrintStream;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Properties;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+import org.apache.commons.codec.binary.Base64;
+import org.apache.commons.codec.binary.Hex;
+import org.relique.jdbc.csv.CsvDriver;
+
 /**
  *
  * @author MAhezh
@@ -17,6 +34,73 @@ public class FrmMain extends javax.swing.JFrame {
     public FrmMain() {
         initComponents();
     }
+    
+    private void search(){
+        try {
+            Properties props = new java.util.Properties();
+            props.put("separator", ";");
+            props.put("ignoreNonParseableLines", true);
+            
+            Class.forName("org.relique.jdbc.csv.CsvDriver");
+            Connection conn = DriverManager.getConnection("jdbc:relique:csv:" + System.getProperty("user.dir"), props);
+            Statement stmt = conn.createStatement();
+            ResultSet results = stmt.executeQuery("SELECT * FROM dump WHERE \"#ADDED\"='2011-Sep-08 05:09:05';");
+            //ResultSet results = stmt.executeQuery("SELECT * FROM dump WHERE \"NAME\"='2018-Feb-10 23:02:26';");
+            while (results.next()) {
+                System.out.println(results.getString(3));
+            }
+            System.out.println("DONE");
+            conn.close();
+        } catch (SQLException e) {
+            e.printStackTrace();
+        } catch (ClassNotFoundException ex) {
+            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+
+    private void importDump() throws Exception {
+        try {
+            File someFile = new File("dump.csv");
+            File temp = File.createTempFile(someFile.getName(), null);
+            BufferedReader reader = null;
+            PrintStream writer = null;
+
+            try {
+                reader = new BufferedReader(new FileReader(someFile));
+                writer = new PrintStream(temp);
+
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    line = line.replaceAll("(?!\";)(?<!;)\"", "\"\"");
+                    writer.println(line);
+                }
+            } finally {
+                if (writer != null) {
+                    writer.close();
+                }
+                if (reader != null) {
+                    reader.close();
+                }
+            }
+            if (!someFile.delete()) {
+                throw new Exception("Failed to remove " + someFile.getName());
+            }
+            if (!temp.renameTo(someFile)) {
+                throw new Exception("Failed to replace " + someFile.getName());
+            }
+        } catch (IOException ex) {
+            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }
+    
+    private void magnet(){
+        String guid = "4QQSPpi9goBxPIOrcbDuurFQwBs=";
+        byte[] decoded = Base64.decodeBase64(guid);
+        String hexString = Hex.encodeHexString(decoded);
+        System.out.println(hexString);
+    }
+    
+    
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -27,21 +111,65 @@ public class FrmMain extends javax.swing.JFrame {
     // <editor-fold defaultstate="collapsed" desc="Generated Code">//GEN-BEGIN:initComponents
     private void initComponents() {
 
+        jButton1 = new javax.swing.JButton();
+        jButton2 = new javax.swing.JButton();
+
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+
+        jButton1.setText("jButton1");
+        jButton1.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton1ActionPerformed(evt);
+            }
+        });
+
+        jButton2.setText("Replace");
+        jButton2.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                jButton2ActionPerformed(evt);
+            }
+        });
 
         javax.swing.GroupLayout layout = new javax.swing.GroupLayout(getContentPane());
         getContentPane().setLayout(layout);
         layout.setHorizontalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 400, Short.MAX_VALUE)
+            .addGroup(layout.createSequentialGroup()
+                .addGap(74, 74, 74)
+                .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 96, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addGap(107, 107, 107)
+                .addComponent(jButton2, javax.swing.GroupLayout.PREFERRED_SIZE, 94, javax.swing.GroupLayout.PREFERRED_SIZE)
+                .addContainerGap(504, Short.MAX_VALUE))
         );
         layout.setVerticalGroup(
             layout.createParallelGroup(javax.swing.GroupLayout.Alignment.LEADING)
-            .addGap(0, 300, Short.MAX_VALUE)
+            .addGroup(layout.createSequentialGroup()
+                .addGap(62, 62, 62)
+                .addGroup(layout.createParallelGroup(javax.swing.GroupLayout.Alignment.BASELINE)
+                    .addComponent(jButton1, javax.swing.GroupLayout.PREFERRED_SIZE, 44, javax.swing.GroupLayout.PREFERRED_SIZE)
+                    .addComponent(jButton2, javax.swing.GroupLayout.PREFERRED_SIZE, 44, javax.swing.GroupLayout.PREFERRED_SIZE))
+                .addContainerGap(544, Short.MAX_VALUE))
         );
 
         pack();
     }// </editor-fold>//GEN-END:initComponents
+
+    private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton1ActionPerformed
+        search();
+    }//GEN-LAST:event_jButton1ActionPerformed
+
+    private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_jButton2ActionPerformed
+        String txt = "2017-Nov-17 04:11:11;rFIQ4bKDDnDrQd2pHS3XHk6Vj2I=;\"Machine Gun Kelly, X Ambassadors & Bebe Rexha - Home (From \"Brig\";8204107\n"
+                + "2011-Sep-08 05:09:05;ckpvsYAbR5lzUYMQObadGXuIzGo=;\"Ron White: They Call Me \\\"Tater Salad\\\"(2004)DVDRip.AC3(ENG)-D\";732773299";
+        
+        System.out.println(txt.replaceAll("(?!\";)(?<!;)\"", "\"\""));
+        
+        try {
+            importDump();
+        } catch (Exception ex) {
+            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }//GEN-LAST:event_jButton2ActionPerformed
 
     /**
      * @param args the command line arguments
@@ -79,5 +207,7 @@ public class FrmMain extends javax.swing.JFrame {
     }
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
+    protected javax.swing.JButton jButton1;
+    protected javax.swing.JButton jButton2;
     // End of variables declaration//GEN-END:variables
 }
