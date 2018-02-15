@@ -26,6 +26,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
+import net.proteanit.sql.DbUtils;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.binary.Hex;
 import org.relique.jdbc.csv.CsvDriver;
@@ -41,10 +42,36 @@ public class FrmMain extends javax.swing.JFrame {
      */
     public FrmMain() {
         initComponents();
+        tblTorrents.setAutoCreateRowSorter(true);
     }
     
-    private void search(){
+    private void search(String qry){
+        
+        //qry = qry.replace("\"", "\"\"");
+        qry = qry.replaceAll("'", "''");
+        qry = qry.trim();
+        qry = qry.replaceAll("(\\s+)", " ");
+        String ready = "";
+        //System.out.println(qry);
+        
+        if (chkSS.isSelected()) {
+            String[] qryParts = qry.split(" ");
+            ready = "UPPER(NAME) LIKE UPPER('%" + qryParts[0] + "%')";
+
+            int c = 1;
+            while (c < qryParts.length) {
+                ready = ready + " AND UPPER(NAME) LIKE UPPER('%" + qryParts[c] + "%')";
+                c++;
+            }
+        } else {
+            ready = "UPPER(NAME) LIKE UPPER('%" + qry + "%')";
+        }
+        
+        //System.out.println(ready);
+
         try {
+            System.out.println("Search Started");
+            //System.out.println("SELECT * FROM dump WHERE \"NAME\" LIKE '" + qry + "' LIMIT 10000;");
             this.setCursor(new Cursor(Cursor.WAIT_CURSOR));
             Properties props = new java.util.Properties();
             props.put("separator", ";");
@@ -53,12 +80,15 @@ public class FrmMain extends javax.swing.JFrame {
             Class.forName("org.relique.jdbc.csv.CsvDriver");
             Connection conn = DriverManager.getConnection("jdbc:relique:csv:" + System.getProperty("user.dir"), props);
             Statement stmt = conn.createStatement();
-            ResultSet results = stmt.executeQuery("SELECT * FROM dump WHERE \"#ADDED\"='2011-Sep-08 05:09:05';");
-            //ResultSet results = stmt.executeQuery("SELECT * FROM dump WHERE \"NAME\"='2018-Feb-10 23:02:26';");
-            while (results.next()) {
-                System.out.println(results.getString(3));
-            }
-            System.out.println("DONE");
+            //ResultSet results = stmt.executeQuery("SELECT * FROM dump WHERE \"#ADDED\"='2011-Sep-08 05:09:05';");
+            ResultSet results = stmt.executeQuery("SELECT * FROM dump WHERE " + ready + " LIMIT 10000;");
+            
+            tblTorrents.setModel(DbUtils.resultSetToTableModel(results));
+            
+//            while (results.next()) {
+//                System.out.println(results.getString(3));
+//            }
+            System.out.println("Search Ended");
             conn.close();
         } catch (SQLException e) {
             e.printStackTrace();
@@ -127,11 +157,17 @@ public class FrmMain extends javax.swing.JFrame {
         txtSearch = new javax.swing.JTextField();
         btnSearch = new javax.swing.JButton();
         jScrollPane1 = new javax.swing.JScrollPane();
-        jTable1 = new javax.swing.JTable();
+        tblTorrents = new javax.swing.JTable();
         jLabel2 = new javax.swing.JLabel();
         jLabel1 = new javax.swing.JLabel();
         btnCpyDesc = new javax.swing.JButton();
         btnCpyTitle = new javax.swing.JButton();
+        jPanel2 = new javax.swing.JPanel();
+        chkSS = new javax.swing.JCheckBox();
+        filler1 = new javax.swing.Box.Filler(new java.awt.Dimension(0, 0), new java.awt.Dimension(0, 0), new java.awt.Dimension(32767, 0));
+        jPanel1 = new javax.swing.JPanel();
+        jLabel3 = new javax.swing.JLabel();
+        jSeparator1 = new javax.swing.JSeparator();
         jMenuBar1 = new javax.swing.JMenuBar();
         mnuTools = new javax.swing.JMenu();
         jMenuItem1 = new javax.swing.JMenuItem();
@@ -141,6 +177,7 @@ public class FrmMain extends javax.swing.JFrame {
         pnlMain.setLayout(new java.awt.GridBagLayout());
 
         txtSearch.setFont(new java.awt.Font("Dialog", 0, 14)); // NOI18N
+        txtSearch.setText("   big       bang    ");
         txtSearch.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 txtSearchActionPerformed(evt);
@@ -156,6 +193,7 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints.insets = new java.awt.Insets(8, 12, 6, 10);
         pnlMain.add(txtSearch, gridBagConstraints);
 
+        btnSearch.setIcon(new javax.swing.ImageIcon(getClass().getResource("/main/res/search-1.png"))); // NOI18N
         btnSearch.setText("Search");
         btnSearch.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -168,10 +206,10 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.ipadx = 55;
         gridBagConstraints.ipady = 13;
-        gridBagConstraints.insets = new java.awt.Insets(7, 0, 0, 12);
+        gridBagConstraints.insets = new java.awt.Insets(7, 0, 3, 12);
         pnlMain.add(btnSearch, gridBagConstraints);
 
-        jTable1.setModel(new javax.swing.table.DefaultTableModel(
+        tblTorrents.setModel(new javax.swing.table.DefaultTableModel(
             new Object [][] {
                 {null, null, null, null},
                 {null, null, null, null},
@@ -182,16 +220,17 @@ public class FrmMain extends javax.swing.JFrame {
                 "Title 1", "Title 2", "Title 3", "Title 4"
             }
         ));
-        jScrollPane1.setViewportView(jTable1);
+        tblTorrents.setRowHeight(27);
+        jScrollPane1.setViewportView(tblTorrents);
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
-        gridBagConstraints.gridy = 3;
+        gridBagConstraints.gridy = 5;
         gridBagConstraints.gridwidth = 2;
         gridBagConstraints.gridheight = 4;
         gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
         gridBagConstraints.weighty = 0.1;
-        gridBagConstraints.insets = new java.awt.Insets(17, 12, 20, 12);
+        gridBagConstraints.insets = new java.awt.Insets(17, 12, 13, 12);
         pnlMain.add(jScrollPane1, gridBagConstraints);
 
         jLabel2.setIcon(new javax.swing.ImageIcon(getClass().getResource("/main/res/tech_tac_alpha_127.png"))); // NOI18N
@@ -204,16 +243,16 @@ public class FrmMain extends javax.swing.JFrame {
         });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 6;
+        gridBagConstraints.gridy = 8;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.PAGE_END;
-        gridBagConstraints.insets = new java.awt.Insets(0, 0, 20, 10);
+        gridBagConstraints.insets = new java.awt.Insets(0, 0, 13, 10);
         pnlMain.add(jLabel2, gridBagConstraints);
 
         jLabel1.setFont(new java.awt.Font("Dialog", 1, 18)); // NOI18N
         jLabel1.setText("By");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 5;
+        gridBagConstraints.gridy = 7;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.PAGE_END;
         gridBagConstraints.weighty = 1.0;
         gridBagConstraints.insets = new java.awt.Insets(11, 0, 8, 0);
@@ -227,7 +266,7 @@ public class FrmMain extends javax.swing.JFrame {
         });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 4;
+        gridBagConstraints.gridy = 6;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.ipadx = 55;
         gridBagConstraints.ipady = 13;
@@ -243,14 +282,58 @@ public class FrmMain extends javax.swing.JFrame {
         });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 3;
+        gridBagConstraints.gridy = 5;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.ipadx = 55;
         gridBagConstraints.ipady = 13;
         gridBagConstraints.insets = new java.awt.Insets(17, 0, 0, 12);
         pnlMain.add(btnCpyTitle, gridBagConstraints);
 
+        jPanel2.setLayout(new java.awt.GridBagLayout());
+
+        chkSS.setSelected(true);
+        chkSS.setText("Smart Search");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.LINE_START;
+        jPanel2.add(chkSS, gridBagConstraints);
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.weightx = 0.1;
+        jPanel2.add(filler1, gridBagConstraints);
+
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 3;
+        gridBagConstraints.gridwidth = 4;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.insets = new java.awt.Insets(2, 12, 0, 12);
+        pnlMain.add(jPanel2, gridBagConstraints);
+
         getContentPane().add(pnlMain, java.awt.BorderLayout.CENTER);
+
+        jPanel1.setLayout(new java.awt.GridBagLayout());
+
+        jLabel3.setText("Ready");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 1;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.weightx = 0.1;
+        gridBagConstraints.insets = new java.awt.Insets(6, 13, 10, 0);
+        jPanel1.add(jLabel3, gridBagConstraints);
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.PAGE_START;
+        gridBagConstraints.weightx = 0.1;
+        jPanel1.add(jSeparator1, gridBagConstraints);
+
+        getContentPane().add(jPanel1, java.awt.BorderLayout.SOUTH);
 
         mnuTools.setText("Tools");
 
@@ -269,7 +352,7 @@ public class FrmMain extends javax.swing.JFrame {
     }//GEN-LAST:event_txtSearchActionPerformed
 
     private void btnSearchActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSearchActionPerformed
-        
+        search(txtSearch.getText());
     }//GEN-LAST:event_btnSearchActionPerformed
 
     private void jLabel2MouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_jLabel2MouseClicked
@@ -322,14 +405,20 @@ public class FrmMain extends javax.swing.JFrame {
     protected javax.swing.JButton btnCpyDesc;
     protected javax.swing.JButton btnCpyTitle;
     protected javax.swing.JButton btnSearch;
+    protected javax.swing.JCheckBox chkSS;
+    protected javax.swing.Box.Filler filler1;
     protected javax.swing.JLabel jLabel1;
     protected javax.swing.JLabel jLabel2;
+    protected javax.swing.JLabel jLabel3;
     protected javax.swing.JMenuBar jMenuBar1;
     protected javax.swing.JMenuItem jMenuItem1;
+    protected javax.swing.JPanel jPanel1;
+    protected javax.swing.JPanel jPanel2;
     protected javax.swing.JScrollPane jScrollPane1;
-    protected javax.swing.JTable jTable1;
+    protected javax.swing.JSeparator jSeparator1;
     protected javax.swing.JMenu mnuTools;
     protected javax.swing.JPanel pnlMain;
+    protected javax.swing.JTable tblTorrents;
     protected javax.swing.JTextField txtSearch;
     // End of variables declaration//GEN-END:variables
 }
