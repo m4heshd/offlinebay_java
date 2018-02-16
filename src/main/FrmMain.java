@@ -6,32 +6,46 @@
 package main;
 
 import de.javasoft.plaf.synthetica.SyntheticaBlackEyeLookAndFeel;
+import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Desktop;
+import java.awt.Toolkit;
+import java.awt.datatransfer.StringSelection;
 import java.awt.event.KeyEvent;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.InputStreamReader;
 import java.io.PrintStream;
+import java.io.UnsupportedEncodingException;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.net.URL;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.text.NumberFormat;
 import java.text.ParseException;
+import java.util.Locale;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import javax.swing.RowFilter;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
+import static main.DBConn.errbox;
 import net.proteanit.sql.DbUtils;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.binary.Hex;
@@ -42,6 +56,8 @@ import org.relique.jdbc.csv.CsvDriver;
  * @author TechTac
  */
 public class FrmMain extends javax.swing.JFrame {
+    
+    private final String USER_AGENT = "Mozilla/5.0";
 
     /**
      * Creates new form FrmMain
@@ -97,8 +113,24 @@ public class FrmMain extends javax.swing.JFrame {
             
             tblTorrents.getColumnModel().getColumn(0).setMaxWidth(200);
             tblTorrents.getColumnModel().getColumn(0).setPreferredWidth(200);
-            tblTorrents.getColumnModel().getColumn(2).setMaxWidth(100);
-            tblTorrents.getColumnModel().getColumn(2).setPreferredWidth(100);
+            tblTorrents.getColumnModel().getColumn(2).setMaxWidth(120);
+            tblTorrents.getColumnModel().getColumn(2).setPreferredWidth(120);
+            
+            int count = tblTorrents.getRowCount();
+            
+            if (count == 20000){
+                lblStatus.setForeground(Color.white);
+                if (chkSS.isSelected()){
+                    lblStatus.setText("<html><span style=\"color:red\">More than 20,000 Results.</span> Please refine your Search or try turning off Smart Search</html>");
+                } else {
+                    lblStatus.setText("<html><span style=\"color:red\">More than 20,000 Results.</span> Please refine your Search</html>");
+                }
+            } else {
+                NumberFormat numberFormat = NumberFormat.getNumberInstance(Locale.US);
+                String countForm = numberFormat.format(count);
+                lblStatus.setForeground(Color.white);
+                lblStatus.setText(countForm + " Results found");
+            }
             
             formatSizes();
 //            while (results.next()) {
@@ -108,6 +140,8 @@ public class FrmMain extends javax.swing.JFrame {
             conn.close();
         } catch (SQLException e) {
             e.printStackTrace();
+            lblStatus.setForeground(Color.red);
+            lblStatus.setText("Search error occured");
         } catch (ClassNotFoundException ex) {
             Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
         } finally {
@@ -173,13 +207,72 @@ public class FrmMain extends javax.swing.JFrame {
         return String.format("%.1f %sB", bytes / Math.pow(unit, exp), pre);
     }
 
-    private void magnet(){
-        String guid = "4QQSPpi9goBxPIOrcbDuurFQwBs=";
-        byte[] decoded = Base64.decodeBase64(guid);
-        String hexString = Hex.encodeHexString(decoded);
-        System.out.println(hexString);
+    private String getMagnet(){
+        
+        String basic = "magnet:?xt=urn:btih:" + getInfoHash();
+        String withName = "";
+        try {
+            withName = basic + "&dn=" + URLEncoder.encode(((String) tblTorrents.getModel().getValueAt(tblTorrents.getSelectedRow(), 2)), "UTF8");
+        } catch (UnsupportedEncodingException ex) {
+            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
+        }
+        String ready = withName + DBConn.loadTrackers(this);
+        
+        System.out.println(ready);
+        return ready;
     }
     
+    private String getInfoHash(){
+        
+        String b64hash = (String) tblTorrents.getModel().getValueAt(tblTorrents.getSelectedRow(), 1);
+        byte[] decoded = Base64.decodeBase64(b64hash);
+        String hexString = Hex.encodeHexString(decoded);
+        //System.out.println(hexString);
+        
+        return hexString;
+    }
+    
+    private void updTrackers() {
+        try {
+            this.setCursor(new Cursor(Cursor.WAIT_CURSOR));
+            String url = "https://newtrackon.com/api/stable";
+
+            URL url_obj = new URL(url);
+            HttpURLConnection con = (HttpURLConnection) url_obj.openConnection();
+
+            con.setRequestMethod("GET");
+            con.setRequestProperty("User-Agent", USER_AGENT);
+
+            BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8));
+            String inputLine;
+            StringBuffer response = new StringBuffer();
+            
+
+            while ((inputLine = in.readLine()) != null) {
+                if (!inputLine.isEmpty()) {
+                    //System.out.print(inputLine);
+                    response.append(inputLine + " ");
+                    //System.out.println(c++);
+                }
+                
+            }
+            in.close();
+            
+            String[] lines = response.toString().split(" ");
+            DBConn.updateTrackers(lines, this);
+            
+            //System.out.println(lines[0]);
+            //System.out.println(response);
+        } catch (MalformedURLException ex) {
+            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
+            errbox(this, "Error updating Trackers(API). Check your internet connection and Please contact TechTac");
+        } catch (IOException ex) {
+            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
+            errbox(this, "Error updating Trackers(API). Check your internet connection and Please contact TechTac");
+        } finally {
+            this.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+        }
+    }
     
 
     /**
@@ -200,20 +293,23 @@ public class FrmMain extends javax.swing.JFrame {
         jLabel2 = new javax.swing.JLabel();
         jLabel1 = new javax.swing.JLabel();
         btnCpyDesc = new javax.swing.JButton();
-        btnCpyTitle = new javax.swing.JButton();
+        btnOpenMag = new javax.swing.JButton();
         jPanel2 = new javax.swing.JPanel();
         chkSS = new javax.swing.JCheckBox();
         filler1 = new javax.swing.Box.Filler(new java.awt.Dimension(0, 0), new java.awt.Dimension(0, 0), new java.awt.Dimension(32767, 0));
         jLabel4 = new javax.swing.JLabel();
         txtFilter = new javax.swing.JTextField();
+        btnCpyMag = new javax.swing.JButton();
         jPanel1 = new javax.swing.JPanel();
-        jLabel3 = new javax.swing.JLabel();
+        lblStatus = new javax.swing.JLabel();
         jSeparator1 = new javax.swing.JSeparator();
         jMenuBar1 = new javax.swing.JMenuBar();
         mnuTools = new javax.swing.JMenu();
         jMenuItem1 = new javax.swing.JMenuItem();
+        mnuUpdTrackers = new javax.swing.JMenuItem();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
+        setTitle("OfflineBay by TechTac");
 
         pnlMain.setLayout(new java.awt.GridBagLayout());
 
@@ -234,7 +330,7 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints.insets = new java.awt.Insets(8, 12, 6, 10);
         pnlMain.add(txtSearch, gridBagConstraints);
 
-        btnSearch.setIcon(new javax.swing.ImageIcon(getClass().getResource("/main/res/search-1.png"))); // NOI18N
+        btnSearch.setIcon(new javax.swing.ImageIcon(getClass().getResource("/main/res/search-icon.png"))); // NOI18N
         btnSearch.setText("Search");
         btnSearch.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -268,7 +364,7 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 5;
         gridBagConstraints.gridwidth = 2;
-        gridBagConstraints.gridheight = 4;
+        gridBagConstraints.gridheight = 5;
         gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
         gridBagConstraints.weighty = 0.1;
         gridBagConstraints.insets = new java.awt.Insets(17, 12, 13, 12);
@@ -284,7 +380,7 @@ public class FrmMain extends javax.swing.JFrame {
         });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 8;
+        gridBagConstraints.gridy = 9;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.PAGE_END;
         gridBagConstraints.insets = new java.awt.Insets(0, 0, 13, 10);
         pnlMain.add(jLabel2, gridBagConstraints);
@@ -293,13 +389,14 @@ public class FrmMain extends javax.swing.JFrame {
         jLabel1.setText("By");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 7;
+        gridBagConstraints.gridy = 8;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.PAGE_END;
         gridBagConstraints.weighty = 1.0;
-        gridBagConstraints.insets = new java.awt.Insets(11, 0, 8, 0);
+        gridBagConstraints.insets = new java.awt.Insets(11, 0, 8, 10);
         pnlMain.add(jLabel1, gridBagConstraints);
 
-        btnCpyDesc.setText("Copy");
+        btnCpyDesc.setIcon(new javax.swing.ImageIcon(getClass().getResource("/main/res/price-tag.png"))); // NOI18N
+        btnCpyDesc.setText("Copy Info Hash");
         btnCpyDesc.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
                 btnCpyDescActionPerformed(evt);
@@ -307,7 +404,7 @@ public class FrmMain extends javax.swing.JFrame {
         });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 6;
+        gridBagConstraints.gridy = 7;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.ipadx = 55;
         gridBagConstraints.ipady = 13;
@@ -315,10 +412,11 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints.insets = new java.awt.Insets(3, 0, 0, 12);
         pnlMain.add(btnCpyDesc, gridBagConstraints);
 
-        btnCpyTitle.setText("Copy");
-        btnCpyTitle.addActionListener(new java.awt.event.ActionListener() {
+        btnOpenMag.setIcon(new javax.swing.ImageIcon(getClass().getResource("/main/res/magnet-arrow-icon.png"))); // NOI18N
+        btnOpenMag.setText("Open Magnet");
+        btnOpenMag.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnCpyTitleActionPerformed(evt);
+                btnOpenMagActionPerformed(evt);
             }
         });
         gridBagConstraints = new java.awt.GridBagConstraints();
@@ -328,7 +426,7 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints.ipadx = 55;
         gridBagConstraints.ipady = 13;
         gridBagConstraints.insets = new java.awt.Insets(17, 0, 0, 12);
-        pnlMain.add(btnCpyTitle, gridBagConstraints);
+        pnlMain.add(btnOpenMag, gridBagConstraints);
 
         jPanel2.setLayout(new java.awt.GridBagLayout());
 
@@ -375,18 +473,35 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints.insets = new java.awt.Insets(2, 12, 0, 12);
         pnlMain.add(jPanel2, gridBagConstraints);
 
+        btnCpyMag.setIcon(new javax.swing.ImageIcon(getClass().getResource("/main/res/magnet-plus-icon.png"))); // NOI18N
+        btnCpyMag.setText("Copy Magnet");
+        btnCpyMag.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                btnCpyMagActionPerformed(evt);
+            }
+        });
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 3;
+        gridBagConstraints.gridy = 6;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.ipadx = 55;
+        gridBagConstraints.ipady = 13;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.PAGE_START;
+        gridBagConstraints.insets = new java.awt.Insets(3, 0, 0, 12);
+        pnlMain.add(btnCpyMag, gridBagConstraints);
+
         getContentPane().add(pnlMain, java.awt.BorderLayout.CENTER);
 
         jPanel1.setLayout(new java.awt.GridBagLayout());
 
-        jLabel3.setText("Ready");
+        lblStatus.setText("Ready");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 1;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.weightx = 0.1;
         gridBagConstraints.insets = new java.awt.Insets(6, 13, 10, 0);
-        jPanel1.add(jLabel3, gridBagConstraints);
+        jPanel1.add(lblStatus, gridBagConstraints);
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 0;
@@ -401,6 +516,14 @@ public class FrmMain extends javax.swing.JFrame {
 
         jMenuItem1.setText("Import Data");
         mnuTools.add(jMenuItem1);
+
+        mnuUpdTrackers.setText("Update Trackers");
+        mnuUpdTrackers.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                mnuUpdTrackersActionPerformed(evt);
+            }
+        });
+        mnuTools.add(mnuUpdTrackers);
 
         jMenuBar1.add(mnuTools);
 
@@ -424,17 +547,27 @@ public class FrmMain extends javax.swing.JFrame {
     }//GEN-LAST:event_jLabel2MouseClicked
 
     private void btnCpyDescActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnCpyDescActionPerformed
-        
+        Toolkit.getDefaultToolkit().getSystemClipboard().setContents(
+                new StringSelection(getInfoHash()),
+                null
+        );
     }//GEN-LAST:event_btnCpyDescActionPerformed
 
-    private void btnCpyTitleActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnCpyTitleActionPerformed
+    private void btnOpenMagActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnOpenMagActionPerformed
         
-    }//GEN-LAST:event_btnCpyTitleActionPerformed
+        try {
+            Desktop.getDesktop().browse(new URI(getMagnet()));
+        } catch (IOException ex) {
+            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (URISyntaxException ex) {
+            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }//GEN-LAST:event_btnOpenMagActionPerformed
 
     private void txtFilterKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtFilterKeyReleased
 
         TableRowSorter<TableModel> sorter = new TableRowSorter<>(((DefaultTableModel) tblTorrents.getModel()));
-        sorter.setRowFilter(RowFilter.regexFilter("(?i)" + Matcher.quoteReplacement(txtFilter.getText())));
+        sorter.setRowFilter(RowFilter.regexFilter("(?i)" + Pattern.quote(txtFilter.getText())));
         tblTorrents.setRowSorter(sorter);
 
     }//GEN-LAST:event_txtFilterKeyReleased
@@ -445,6 +578,21 @@ public class FrmMain extends javax.swing.JFrame {
             search(txtSearch.getText());
         }
     }//GEN-LAST:event_txtSearchKeyTyped
+
+    private void mnuUpdTrackersActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_mnuUpdTrackersActionPerformed
+        java.awt.EventQueue.invokeLater(new Runnable() {
+            public void run() {
+                updTrackers();
+            }
+        }); 
+    }//GEN-LAST:event_mnuUpdTrackersActionPerformed
+
+    private void btnCpyMagActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnCpyMagActionPerformed
+        Toolkit.getDefaultToolkit().getSystemClipboard().setContents(
+                new StringSelection(getMagnet()),
+                null
+        );
+    }//GEN-LAST:event_btnCpyMagActionPerformed
 
     /**
      * @param args the command line arguments
@@ -476,13 +624,13 @@ public class FrmMain extends javax.swing.JFrame {
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     protected javax.swing.JButton btnCpyDesc;
-    protected javax.swing.JButton btnCpyTitle;
+    protected javax.swing.JButton btnCpyMag;
+    protected javax.swing.JButton btnOpenMag;
     protected javax.swing.JButton btnSearch;
     protected javax.swing.JCheckBox chkSS;
     protected javax.swing.Box.Filler filler1;
     protected javax.swing.JLabel jLabel1;
     protected javax.swing.JLabel jLabel2;
-    protected javax.swing.JLabel jLabel3;
     protected javax.swing.JLabel jLabel4;
     protected javax.swing.JMenuBar jMenuBar1;
     protected javax.swing.JMenuItem jMenuItem1;
@@ -490,7 +638,9 @@ public class FrmMain extends javax.swing.JFrame {
     protected javax.swing.JPanel jPanel2;
     protected javax.swing.JScrollPane jScrollPane1;
     protected javax.swing.JSeparator jSeparator1;
+    protected javax.swing.JLabel lblStatus;
     protected javax.swing.JMenu mnuTools;
+    protected javax.swing.JMenuItem mnuUpdTrackers;
     protected javax.swing.JPanel pnlMain;
     protected javax.swing.JTable tblTorrents;
     protected javax.swing.JTextField txtFilter;

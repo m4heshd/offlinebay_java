@@ -1,0 +1,122 @@
+/*
+ * To change this license header, choose License Headers in Project Properties.
+ * To change this template file, choose Tools | Templates
+ * and open the template in the editor.
+ */
+package main;
+
+import java.awt.Component;
+import java.net.URLEncoder;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.Collections;
+import javax.swing.JComboBox;
+import javax.swing.JOptionPane;
+
+/**
+ *
+ * @author MAhezh
+ */
+public class DBConn {
+    public static int updateSQLite(String update) {
+        Connection c = null;
+        Statement stmt = null;
+        int rs = 0;
+        try {
+            Class.forName("org.sqlite.JDBC");
+            c = DriverManager.getConnection("jdbc:sqlite:config");
+            c.setAutoCommit(true);
+            System.out.println("Database connection established (Update SQLite)");
+
+            stmt = c.createStatement();
+            rs = stmt.executeUpdate(update);
+            //c.commit();
+            //rs.close();
+            stmt.close();
+            c.close();
+        } catch (Exception e) {
+            System.err.println(e.getClass().getName() + ": " + e.getMessage());
+        }
+
+        System.out.println("Database connection terminated (Update SQLite)");
+        return rs;
+    }
+    
+    public static void updateTrackers(String[] trcks, Component parent) {
+        int res1 = updateSQLite("DELETE FROM `trackers`;");
+        int res2 = 0;
+        for (int i = 0; i < trcks.length; i++) {
+            int no = i+1;
+            res2 = res2 + updateSQLite("INSERT INTO `trackers`(`no`,`trcks`) VALUES (" + no + ",'" + trcks[i] + "');");
+        }
+        if (res1 != 0 && res2 != 0) {
+            msgbox(parent, "Trackers updated successfully");
+        } else {
+            errbox(parent, "Error updating Trackers(DB). Please contact TechTac");
+        }
+    }
+    
+    public static String loadTrackers(Component parent) {
+        Connection c = null;
+        Statement stmt = null;
+        String trcks = "";
+        
+        try {
+            Class.forName("org.sqlite.JDBC");
+            c = DriverManager.getConnection("jdbc:sqlite:config");
+            c.setAutoCommit(false);
+            System.out.println("loadTrackers opened database successfully");
+
+            stmt = c.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT COUNT(*) FROM `trackers`;");
+            
+            int count = 0;
+            while (rs.next()) {
+                count = rs.getInt(1);
+            }
+            
+            ArrayList<Integer> nums = new ArrayList<Integer>();
+            for (int i = 1; i <= count; i++) {
+                nums.add(i);
+            }
+            Collections.shuffle(nums);
+            
+            rs = stmt.executeQuery("SELECT trcks FROM `trackers` WHERE "
+                    + "no=" + nums.get(0) + " OR "
+                    + "no=" + nums.get(1) + " OR "
+                    + "no=" + nums.get(2) + " OR "
+                    + "no=" + nums.get(3) + " OR "
+                    + "no=" + nums.get(4) + ";");
+            
+            
+            
+            while (rs.next()) {
+                trcks = trcks + "&tr=" + URLEncoder.encode(rs.getString("trcks"), "UTF8");
+            }
+            
+            rs.close();
+            stmt.close();
+            c.close();
+        } catch (Exception e) {
+            System.err.println(e.getClass().getName() + ": " + e.getMessage());
+            errbox(parent, "Error loading Trackers. Please contact TechTac");
+            //System.exit(0);
+        }
+
+        System.out.println("loadTrackers done successfully");
+        
+        return trcks;
+        
+    }
+    
+    public static void msgbox(Component parent, String s) {
+        JOptionPane.showMessageDialog(parent, s);
+    }
+
+    public static void errbox(Component parent, String s) {
+        JOptionPane.showMessageDialog(parent, s, "Error", JOptionPane.ERROR_MESSAGE);
+    }
+}
