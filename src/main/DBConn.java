@@ -45,7 +45,114 @@ public class DBConn {
         return rs;
     }
     
-    public static void updateTrackers(String[] trcks, Component parent) {
+    public static int getDpl() {
+        Connection c = null;
+        Statement stmt = null;
+        int dpl = 0;
+        try {
+            Class.forName("org.sqlite.JDBC");
+            c = DriverManager.getConnection("jdbc:sqlite:config");
+            c.setAutoCommit(false);
+            System.out.println("getDpl opened database successfully");
+
+            stmt = c.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT display FROM `app_sets`;");
+            
+            while(rs.next()){
+                dpl = rs.getInt("display");
+            }
+            
+            rs.close();
+            stmt.close();
+            c.close();
+        } catch (Exception e) {
+            System.err.println(e.getClass().getName() + ": " + e.getMessage());
+            //System.exit(0);
+        }
+
+        System.out.println("getDpl done successfully");
+        
+        return dpl;
+    }
+    
+    public static void setDpl(int display) {
+        String dpl = Integer.toString(display);
+        updateSQLite("UPDATE `app_sets` SET display = " + dpl + "");
+    }
+    
+    public static int getState() {
+        Connection c = null;
+        Statement stmt = null;
+        int wstate = 0;
+        try {
+            Class.forName("org.sqlite.JDBC");
+            c = DriverManager.getConnection("jdbc:sqlite:config");
+            c.setAutoCommit(false);
+            System.out.println("getState opened database successfully");
+
+            stmt = c.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT wstate FROM `app_sets`;");
+            
+            while(rs.next()){
+                wstate = rs.getInt("wstate");
+            }
+            
+            rs.close();
+            stmt.close();
+            c.close();
+        } catch (Exception e) {
+            System.err.println(e.getClass().getName() + ": " + e.getMessage());
+            //System.exit(0);
+        }
+
+        System.out.println("getState done successfully");
+        
+        return wstate;
+    }
+    
+    public static void setState(int wstate) {
+        String state = Integer.toString(wstate);
+        updateSQLite("UPDATE `app_sets` SET wstate = " + state + "");
+    }
+    
+    public static int[] getSizePos() {
+        Connection c = null;
+        Statement stmt = null;
+        int[] bounds = {0,0,0,0};
+        try {
+            Class.forName("org.sqlite.JDBC");
+            c = DriverManager.getConnection("jdbc:sqlite:config");
+            c.setAutoCommit(false);
+            System.out.println("getSizePos opened database successfully");
+
+            stmt = c.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT * FROM `app_sets`;");
+            
+            while(rs.next()){
+                bounds[0] = rs.getInt("pos_x");
+                bounds[1] = rs.getInt("pos_y");
+                bounds[2] = rs.getInt("width");
+                bounds[3] = rs.getInt("height");
+            }
+            
+            rs.close();
+            stmt.close();
+            c.close();
+        } catch (Exception e) {
+            System.err.println(e.getClass().getName() + ": " + e.getMessage());
+            //System.exit(0);
+        }
+
+        System.out.println("getSizePos done successfully");
+        
+        return bounds;
+    }
+    
+    public static void setSizePos(int x, int y, int w, int h) {
+        updateSQLite("UPDATE `app_sets` SET pos_x = " + x + ", pos_y = " + y + ", width = " + w + ", height = " + h + ";");
+    }
+    
+    public static boolean updateTrackers(String[] trcks, Component parent) {
         int res1 = updateSQLite("DELETE FROM `trackers`;");
         int res2 = 0;
         for (int i = 0; i < trcks.length; i++) {
@@ -53,9 +160,9 @@ public class DBConn {
             res2 = res2 + updateSQLite("INSERT INTO `trackers`(`no`,`trcks`) VALUES (" + no + ",'" + trcks[i] + "');");
         }
         if (res1 != 0 && res2 != 0) {
-            msgbox(parent, "Trackers updated successfully");
+            return true;
         } else {
-            errbox(parent, "Error updating Trackers(DB). Please contact TechTac");
+            return false;
         }
     }
     
