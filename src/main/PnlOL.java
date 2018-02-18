@@ -12,7 +12,7 @@ import java.awt.Graphics2D;
 
 /**
  *
- * @author MAhezh
+ * @author TechTac
  */
 public class PnlOL extends javax.swing.JPanel {
 
@@ -21,6 +21,7 @@ public class PnlOL extends javax.swing.JPanel {
      */
     public PnlOL() {
         initComponents();
+        lblProg.setVisible(false);
         //setBackground(new Color(0,0,0,20));
     }
     
@@ -62,6 +63,7 @@ public class PnlOL extends javax.swing.JPanel {
 
         lblStat = new javax.swing.JLabel();
         jLabel1 = new javax.swing.JLabel();
+        lblProg = new javax.swing.JLabel();
 
         setLayout(new java.awt.GridBagLayout());
 
@@ -78,11 +80,18 @@ public class PnlOL extends javax.swing.JPanel {
         gridBagConstraints.gridy = 1;
         gridBagConstraints.insets = new java.awt.Insets(9, 0, 0, 0);
         add(jLabel1, gridBagConstraints);
+
+        lblProg.setFont(new java.awt.Font("Dialog", 1, 14)); // NOI18N
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 0;
+        gridBagConstraints.gridy = 2;
+        add(lblProg, gridBagConstraints);
     }// </editor-fold>//GEN-END:initComponents
 
 
     // Variables declaration - do not modify//GEN-BEGIN:variables
     protected javax.swing.JLabel jLabel1;
+    public javax.swing.JLabel lblProg;
     public javax.swing.JLabel lblStat;
     // End of variables declaration//GEN-END:variables
 }

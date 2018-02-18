@@ -15,7 +15,7 @@ import javax.swing.JLabel;
 
 /**
  *
- * @author MAhezh
+ * @author TechTac
  */
 public class PnlNtf extends javax.swing.JPanel {
 
@@ -37,7 +37,7 @@ public class PnlNtf extends javax.swing.JPanel {
             }
         });
 
-        lblMsg.setBackground(new java.awt.Color(122, 122, 122));
+        lblMsg.setBackground(new java.awt.Color(102, 102, 102));
 
         lblMsg.setFont(new java.awt.Font("Dialog", 0, 16)); // NOI18N
 
@@ -89,7 +89,7 @@ public class PnlNtf extends javax.swing.JPanel {
         gridBagConstraints.weightx = 0.1;
         add(filler2, gridBagConstraints);
 
-        jLabel2.setBackground(new java.awt.Color(102, 102, 102));
+        jLabel2.setBackground(new java.awt.Color(0, 90, 0));
         jLabel2.setFont(new java.awt.Font("Dialog", 0, 14)); // NOI18N
         jLabel2.setHorizontalAlignment(javax.swing.SwingConstants.CENTER);
         jLabel2.setText("Magnet link copied!");
@@ -156,8 +156,6 @@ class CustomLbl extends JLabel {
         g2d.setRenderingHint(RenderingHints.KEY_STROKE_CONTROL, RenderingHints.VALUE_STROKE_PURE);
         g2d.setRenderingHint(RenderingHints.KEY_ALPHA_INTERPOLATION, RenderingHints.VALUE_ALPHA_INTERPOLATION_QUALITY);
         g2d.setComposite(AlphaComposite.SrcOver.derive(getAlpha()));
-        g2d.setColor(getBackground());
-        g2d.fillRoundRect(5, 5, getWidth()-11, getHeight()-11, 10, 10);
         int shade = 0;
         int topOpacity = 80;
         int pixels = 6;
@@ -166,11 +164,12 @@ class CustomLbl extends JLabel {
             g2d.setColor(new Color(shade, shade, shade, ((topOpacity / pixels) * i)));
             //g2d.drawRect(i, i, (this.getWidth()) - ((i * 2) + 1), (this.getHeight()) - ((i * 2) + 1));
             g2d.drawRoundRect(i, i, (this.getWidth()) - ((i * 2) + 1), (this.getHeight()) - ((i * 2) + 1), 10, 10);
-        }
+        }        
+        g2d.setColor(getBackground()); 
+        g2d.fillRoundRect(5, 5, getWidth()-11, getHeight()-11, 10, 10);
         g2d.dispose();
+        
         super.paintComponent(g);
-        
-        
 
     }
 }

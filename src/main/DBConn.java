@@ -18,7 +18,7 @@ import javax.swing.JOptionPane;
 
 /**
  *
- * @author MAhezh
+ * @author TechTac
  */
 public class DBConn {
     public static int updateSQLite(String update) {

@@ -30,6 +30,9 @@ import java.net.URISyntaxException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -37,11 +40,13 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.NumberFormat;
 import java.text.ParseException;
+import java.util.List;
 import java.util.Locale;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
+import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.RowFilter;
 import javax.swing.SwingWorker;
@@ -49,6 +54,7 @@ import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.event.ListSelectionEvent;
 import javax.swing.event.ListSelectionListener;
+import javax.swing.filechooser.FileNameExtensionFilter;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableModel;
 import javax.swing.table.TableRowSorter;
@@ -173,6 +179,8 @@ public class FrmMain extends javax.swing.JFrame {
         setCompEnable(true);
         isLoading = false;
         pnlOL.lblStat.setText("Waiting..");
+        pnlOL.lblProg.setText("");
+        pnlOL.lblProg.setVisible(false);
     }
     
     private void setCompEnable(boolean enable) {
@@ -201,7 +209,7 @@ public class FrmMain extends javax.swing.JFrame {
         }
     }
 
-    private void sendNtf(String msg) {
+    private void sendNtf(String msg, String mode) {
 
         SwingWorker<Void, Void> backgroundProcess;
         backgroundProcess = new SwingWorker<Void, Void>() {
@@ -222,6 +230,11 @@ public class FrmMain extends javax.swing.JFrame {
                     final Component glassPane = getGlassPane();
                     final PnlNtf panel = new PnlNtf();
                     panel.lblMsg.setText(msg);
+                    if (mode == "err"){
+                        panel.lblMsg.setBackground(new Color(133, 0, 0));
+                    } else if (mode == "scs"){
+                        panel.lblMsg.setBackground(new Color(0, 90, 0));
+                    }
                     setGlassPane(panel);
                     panel.revalidate();
                     panel.setOpaque(false);
@@ -334,33 +347,62 @@ public class FrmMain extends javax.swing.JFrame {
 //            }
             System.out.println("Search Ended");
             conn.close();
-        } catch (SQLException e) {
-            e.printStackTrace();
+        } catch (Exception e) {
+            //System.out.println("ERROR OCCURED");
             lblStatus.setForeground(Color.red);
             lblStatus.setText("Search error occured");
-        } catch (ClassNotFoundException ex) {
-            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
+            sendNtf("Search error occured!! Try importing a clean dump file", "err");
+            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, e);
         } finally {
             endOL();
             //this.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
         }
     }
 
-    private void importDump() throws Exception {
+    private void importDump(String path) throws Exception {
+        pnlOL.lblProg.setText("Setting up..");
+        pnlOL.lblProg.setVisible(true);
+        startOL("Importing..");
         try {
-            File someFile = new File("dump.csv");
-            File temp = File.createTempFile(someFile.getName(), null);
+            Path sourchPath = Paths.get(path);
+            long lineCount = Files.lines(sourchPath).count();
+
+            File sourceCSV = new File(path);
+            File curCSV = new File("dump.csv");
+            if (!curCSV.exists()) {
+                if (!curCSV.createNewFile()) {
+                    endOL();
+                    sendNtf("Failed to Import. Unable to create new files. Try running as Administrator", "err");
+                    return;
+                }
+            }
+            File temp = File.createTempFile(sourceCSV.getName(), null);
             BufferedReader reader = null;
             PrintStream writer = null;
 
             try {
-                reader = new BufferedReader(new FileReader(someFile));
+                reader = new BufferedReader(new FileReader(sourceCSV));
                 writer = new PrintStream(temp);
 
                 String line;
+                long curLine = 0;
+                int percentage = 0;
                 while ((line = reader.readLine()) != null) {
+                    if (curLine == 0){
+                        if (line.equals("#ADDED;HASH(B64);NAME;SIZE(BYTES)")){
+                            System.out.println("FILE OK");
+                        } else {
+                            temp.delete();
+                            endOL();
+                            sendNtf("Failed to Import. Selected CSV has a mismatching format!!", "err");
+                            return;
+                        }
+                    } 
                     line = line.replaceAll("(?!\";)(?<!;)\"", "\"\"");
                     writer.println(line);
+                    curLine++;
+                    percentage = Math.round((100.0f / lineCount) * curLine);
+                    pnlOL.lblProg.setText("Processing dump file - " + percentage + "%");
                 }
             } finally {
                 if (writer != null) {
@@ -370,15 +412,24 @@ public class FrmMain extends javax.swing.JFrame {
                     reader.close();
                 }
             }
-            if (!someFile.delete()) {
-                throw new Exception("Failed to remove " + someFile.getName());
+            if (!curCSV.delete()) {
+                temp.delete();
+                endOL();
+                throw new Exception("Failed to remove " + curCSV.getName());
             }
-            if (!temp.renameTo(someFile)) {
-                throw new Exception("Failed to replace " + someFile.getName());
+            if (!temp.renameTo(curCSV)) {
+                endOL();
+                throw new Exception("Failed to replace " + sourceCSV.getName());
             }
+            endOL();
+            sendNtf("Importing successfully finished!", "scs");
+            lblStatus.setForeground(Color.white);
+            lblStatus.setText("Ready");
         } catch (IOException ex) {
+            endOL();
             Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
-        }
+            sendNtf("Failed to Import. Unable to perform a file operation", "err");
+        } 
     }
     
     private void formatSizes(){
@@ -460,7 +511,7 @@ public class FrmMain extends javax.swing.JFrame {
             boolean success = DBConn.updateTrackers(lines, this);
 
             if (success) {
-                sendNtf("Trackers updated successfully");
+                sendNtf("Trackers updated successfully", "scs");
                 //msgbox(this, "Trackers updated successfully");
             } else {
                 errbox(this, "Error updating Trackers(DB). Please contact TechTac");
@@ -517,7 +568,7 @@ public class FrmMain extends javax.swing.JFrame {
         jSeparator2 = new javax.swing.JSeparator();
         jMenuBar1 = new javax.swing.JMenuBar();
         mnuTools = new javax.swing.JMenu();
-        jMenuItem1 = new javax.swing.JMenuItem();
+        mnuImport = new javax.swing.JMenuItem();
         mnuUpdTrackers = new javax.swing.JMenuItem();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
@@ -821,9 +872,16 @@ public class FrmMain extends javax.swing.JFrame {
 
         mnuTools.setText("Tools");
 
-        jMenuItem1.setText("Import Data");
-        mnuTools.add(jMenuItem1);
+        mnuImport.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_I, java.awt.event.InputEvent.CTRL_MASK));
+        mnuImport.setText("Import Data");
+        mnuImport.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                mnuImportActionPerformed(evt);
+            }
+        });
+        mnuTools.add(mnuImport);
 
+        mnuUpdTrackers.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_U, java.awt.event.InputEvent.CTRL_MASK));
         mnuUpdTrackers.setText("Update Trackers");
         mnuUpdTrackers.addActionListener(new java.awt.event.ActionListener() {
             public void actionPerformed(java.awt.event.ActionEvent evt) {
@@ -871,14 +929,14 @@ public class FrmMain extends javax.swing.JFrame {
                 new StringSelection(getInfoHash()),
                 null
         );
-        sendNtf("Info Hash copied to Clipboard..");
+        sendNtf("Info Hash copied to Clipboard..", null);
     }//GEN-LAST:event_btnCpyHashActionPerformed
 
     private void btnOpenMagActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnOpenMagActionPerformed
         
         try {
             Desktop.getDesktop().browse(new URI(getMagnet()));
-            sendNtf("Opening Magnet link in default Torrent Client..");
+            sendNtf("Opening Magnet link in default Torrent Client..", null);
         } catch (IOException ex) {
             Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
         } catch (URISyntaxException ex) {
@@ -936,7 +994,7 @@ public class FrmMain extends javax.swing.JFrame {
                 new StringSelection(getMagnet()),
                 null
         );
-        sendNtf("Magnet link copied to Clipboard..");
+        sendNtf("Magnet link copied to Clipboard..", null);
     }//GEN-LAST:event_btnCpyMagActionPerformed
 
     private void formWindowStateChanged(java.awt.event.WindowEvent evt) {//GEN-FIRST:event_formWindowStateChanged
@@ -961,14 +1019,14 @@ public class FrmMain extends javax.swing.JFrame {
     }//GEN-LAST:event_btnSvFileActionPerformed
 
     private void btnSvFile1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSvFile1ActionPerformed
-        sendNtf("Notification test");
+        sendNtf("Notification test", "scs");
     }//GEN-LAST:event_btnSvFile1ActionPerformed
 
     private void tblTorrentsMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tblTorrentsMouseClicked
         if (evt.getClickCount() == 2) {
             try {
                 Desktop.getDesktop().browse(new URI(getMagnet()));
-                sendNtf("Opening Magnet link in default Torrent Client..");
+                sendNtf("Opening Magnet link in default Torrent Client..", null);
             } catch (IOException ex) {
                 Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
             } catch (URISyntaxException ex) {
@@ -984,6 +1042,38 @@ public class FrmMain extends javax.swing.JFrame {
 //        System.out.println(this.getHeight());
         DBConn.setSizePos(this.getX(), this.getY(), this.getWidth(), this.getHeight());
     }//GEN-LAST:event_formWindowClosing
+
+    private void mnuImportActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_mnuImportActionPerformed
+        JFileChooser fc = new JFileChooser();
+        FileNameExtensionFilter filter = new FileNameExtensionFilter("CSV Files", "csv");
+        fc.setFileFilter(filter);
+        fc.setDialogTitle("Open thePirateBay Dump CSV file");
+        fc.setAcceptAllFileFilterUsed(false);
+        int returnVal = fc.showOpenDialog(this);
+        if (returnVal == JFileChooser.APPROVE_OPTION) {
+            String path = fc.getSelectedFile().getPath();
+            SwingWorker<Void, Void> backgroundProcess;
+            backgroundProcess = new SwingWorker<Void, Void>() {
+
+                @Override
+                protected Void doInBackground() throws Exception {
+                    try {
+                        importDump(path);
+                    } catch (Exception ex) {
+                        endOL();
+                        sendNtf("Importing Failed. Unable to do changes to the current dump", "err");
+                        Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
+                    }
+                    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+                }
+
+            };
+            backgroundProcess.execute();
+
+        } else {
+            sendNtf("Importing cancelled by User..", null);
+        }
+    }//GEN-LAST:event_mnuImportActionPerformed
 
     /**
      * @param args the command line arguments
@@ -1026,7 +1116,6 @@ public class FrmMain extends javax.swing.JFrame {
     protected javax.swing.JLabel jLabel2;
     protected javax.swing.JLabel jLabel4;
     protected javax.swing.JMenuBar jMenuBar1;
-    protected javax.swing.JMenuItem jMenuItem1;
     protected javax.swing.JPanel jPanel1;
     protected javax.swing.JPanel jPanel2;
     protected javax.swing.JScrollPane jScrollPane1;
@@ -1034,6 +1123,7 @@ public class FrmMain extends javax.swing.JFrame {
     protected javax.swing.JSeparator jSeparator2;
     protected javax.swing.JLabel lblStatus;
     protected javax.swing.JLabel lblStatus2;
+    protected javax.swing.JMenuItem mnuImport;
     protected javax.swing.JMenu mnuTools;
     protected javax.swing.JMenuItem mnuUpdTrackers;
     protected javax.swing.JPanel pnlMain;
