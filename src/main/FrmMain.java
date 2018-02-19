@@ -13,6 +13,7 @@ import java.awt.Container;
 import java.awt.Desktop;
 import java.awt.GraphicsDevice;
 import java.awt.GraphicsEnvironment;
+import java.awt.Point;
 import java.awt.Toolkit;
 import java.awt.datatransfer.StringSelection;
 import java.awt.event.KeyEvent;
@@ -40,15 +41,20 @@ import java.sql.SQLException;
 import java.sql.Statement;
 import java.text.NumberFormat;
 import java.text.ParseException;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Properties;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import java.util.regex.Pattern;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JPanel;
 import javax.swing.RowFilter;
+import javax.swing.SwingUtilities;
 import javax.swing.SwingWorker;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
@@ -64,6 +70,7 @@ import net.proteanit.sql.DbUtils;
 import org.apache.commons.codec.binary.Base64;
 import org.apache.commons.codec.binary.Hex;
 import org.relique.jdbc.csv.CsvDriver;
+import techtac.LiveTracker;
 
 /**
  *
@@ -76,8 +83,26 @@ public class FrmMain extends javax.swing.JFrame {
     public int wstate = 6;
     private PnlOL pnlOL = new PnlOL();
     private volatile boolean isLoading = false;
-    private Component glassPane = getGlassPane();
+    private JPanel glassPane = new JPanel() {
+            @Override
+            public boolean contains(int x, int y) {
+                Component[] components = getComponents();
+                for (int i = 0; i < components.length; i++) {
+                    Component component = components[i];
+                    Point containerPoint = SwingUtilities.convertPoint(
+                            this,
+                            x, y,
+                            component);
+                    if (component.contains(containerPoint)) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        };
     private Thread not = new Thread();
+    private SwingWorker<Void, Void> seedCounter;
+    private volatile boolean scraping = false;
     
 
     /**
@@ -88,8 +113,10 @@ public class FrmMain extends javax.swing.JFrame {
         wstate = DBConn.getState();
         
         initComponents();
+        glassPane.setOpaque(false);
         lblStatus2.setVisible(false);
         jSeparator2.setVisible(false);
+        hideSeedsPanel();
         tblTorrents.setAutoCreateRowSorter(true);
         
         showOnScreen(display, this);
@@ -134,44 +161,15 @@ public class FrmMain extends javax.swing.JFrame {
         //System.out.println(gd.getDefaultConfiguration().getBounds().getHeight());
     }
     
-    public void startLoading() {
-        isLoading = true;
-        glassPane = getGlassPane();
-        setGlassPane(pnlOL);
-        pnlOL.revalidate();
-        setCompEnable(false);
-        pnlOL.setVisible(true);
-        pnlOL.setAlpha(0.5f);
-
-
-        Thread thread = new Thread() {
-            @Override
-            public void run() {
-
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-                // loading finished
-                setGlassPane(glassPane);
-                setCompEnable(true);
-            }
-        };
-        thread.start();
-    }
-    
     public void startOL(String stat) {
         isLoading = true;
-        glassPane = getGlassPane();
+        //glassPane = getGlassPane();
         setGlassPane(pnlOL);
         pnlOL.revalidate();
         pnlOL.setAlpha(0.5f);
         setCompEnable(false);
         pnlOL.lblStat.setText(stat);
-        
         pnlOL.setVisible(true);
-        
     }
     
     public void endOL() {
@@ -227,13 +225,15 @@ public class FrmMain extends javax.swing.JFrame {
             @Override
             protected void done() {
                 if (!isLoading) {
-                    final Component glassPane = getGlassPane();
+                    //final Component glassPane = getGlassPane();
                     final PnlNtf panel = new PnlNtf();
                     panel.lblMsg.setText(msg);
                     if (mode == "err"){
                         panel.lblMsg.setBackground(new Color(133, 0, 0));
                     } else if (mode == "scs"){
                         panel.lblMsg.setBackground(new Color(0, 90, 0));
+                    } else if (mode == "warn"){
+                        panel.lblMsg.setBackground(new Color(153, 102, 0));
                     }
                     setGlassPane(panel);
                     panel.revalidate();
@@ -312,7 +312,7 @@ public class FrmMain extends javax.swing.JFrame {
             Connection conn = DriverManager.getConnection("jdbc:relique:csv:" + System.getProperty("user.dir"), props);
             Statement stmt = conn.createStatement();
             //ResultSet results = stmt.executeQuery("SELECT * FROM dump WHERE \"#ADDED\"='2011-Sep-08 05:09:05';");
-            ResultSet results = stmt.executeQuery("SELECT * FROM dump WHERE " + ready + " LIMIT 20000;");
+            ResultSet results = stmt.executeQuery("SELECT * FROM dump WHERE " + ready + " LIMIT 10000;");
             
             tblTorrents.setModel(DbUtils.resultSetToTableModel(results));
             tblTorrents.getColumnModel().removeColumn(tblTorrents.getColumnModel().getColumn(1));
@@ -327,12 +327,12 @@ public class FrmMain extends javax.swing.JFrame {
             
             int count = tblTorrents.getRowCount();
             
-            if (count == 20000){
+            if (count == 10000){
                 lblStatus.setForeground(Color.white);
                 if (chkSS.isSelected()){
-                    lblStatus.setText("<html><span style=\"color:red\">More than 20,000 Results.</span> Please refine your Search or try turning off Smart Search</html>");
+                    lblStatus.setText("<html><span style=\"color:red\">More than 10,000 Results.</span> Please refine your Search or try turning off Smart Search</html>");
                 } else {
-                    lblStatus.setText("<html><span style=\"color:red\">More than 20,000 Results.</span> Please refine your Search</html>");
+                    lblStatus.setText("<html><span style=\"color:red\">More than 10,000 Results.</span> Please refine your Search</html>");
                 }
             } else {
                 NumberFormat numberFormat = NumberFormat.getNumberInstance(Locale.US);
@@ -341,7 +341,7 @@ public class FrmMain extends javax.swing.JFrame {
                 lblStatus.setText(countForm + " Results found");
             }
             
-            formatSizes();
+            formatTbl();
 //            while (results.next()) {
 //                System.out.println(results.getString(3));
 //            }
@@ -432,7 +432,7 @@ public class FrmMain extends javax.swing.JFrame {
         } 
     }
     
-    private void formatSizes(){
+    private void formatTbl(){
         
         int count = tblTorrents.getModel().getRowCount();
         for (int row = 0; row < count; row++) {
@@ -441,6 +441,7 @@ public class FrmMain extends javax.swing.JFrame {
             Long val = Long.parseLong(val_string);
             String fin_val = humanReadableByteCount(val, false);
             tblTorrents.getModel().setValueAt(fin_val, row, 3);
+            tblTorrents.getModel().setValueAt(new TableObj((String) tblTorrents.getModel().getValueAt(row, 2), (String) tblTorrents.getModel().getValueAt(row, 1)), row, 2);
         }
 
     }
@@ -460,7 +461,7 @@ public class FrmMain extends javax.swing.JFrame {
         String basic = "magnet:?xt=urn:btih:" + getInfoHash();
         String withName = "";
         try {
-            withName = basic + "&dn=" + URLEncoder.encode(((String) tblTorrents.getModel().getValueAt(tblTorrents.getSelectedRow(), 2)), "UTF8");
+            withName = basic + "&dn=" + URLEncoder.encode(((TableObj) tblTorrents.getValueAt(tblTorrents.getSelectedRow(), 1)).name, "UTF8");
         } catch (UnsupportedEncodingException ex) {
             Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
         }
@@ -472,7 +473,8 @@ public class FrmMain extends javax.swing.JFrame {
     
     private String getInfoHash(){
         
-        String b64hash = (String) tblTorrents.getModel().getValueAt(tblTorrents.getSelectedRow(), 1);
+        //String b64hash = (String) tblTorrents.getModel().getValueAt(tblTorrents.getSelectedRow(), 1);
+        String b64hash = ((TableObj) tblTorrents.getValueAt(tblTorrents.getSelectedRow(), 1)).hash;
         byte[] decoded = Base64.decodeBase64(b64hash);
         String hexString = Hex.encodeHexString(decoded);
         //System.out.println(hexString);
@@ -480,59 +482,193 @@ public class FrmMain extends javax.swing.JFrame {
         return hexString;
     }
     
-    private void updTrackers() {
-        try {
-            //this.setCursor(new Cursor(Cursor.WAIT_CURSOR));
-            startOL("Updating Trackers..");
-            String url = "https://newtrackon.com/api/stable";
-
-            URL url_obj = new URL(url);
-            HttpURLConnection con = (HttpURLConnection) url_obj.openConnection();
-
-            con.setRequestMethod("GET");
-            con.setRequestProperty("User-Agent", USER_AGENT);
-
-            BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8));
-            String inputLine;
-            StringBuffer response = new StringBuffer();
-            
-
-            while ((inputLine = in.readLine()) != null) {
-                if (!inputLine.isEmpty()) {
-                    //System.out.print(inputLine);
-                    response.append(inputLine + " ");
-                    //System.out.println(c++);
-                }
-                
-            }
-            in.close();
-            
-            String[] lines = response.toString().split(" ");
-            boolean success = DBConn.updateTrackers(lines, this);
-
-            if (success) {
-                sendNtf("Trackers updated successfully", "scs");
-                //msgbox(this, "Trackers updated successfully");
-            } else {
-                errbox(this, "Error updating Trackers(DB). Please contact TechTac");
-            }
-            
-            //System.out.println(lines[0]);
-            //System.out.println(response);
-        } catch (MalformedURLException ex) {
-            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
-            errbox(this, "Error updating Trackers(API). Check your internet connection and Please contact TechTac");
-        } catch (IOException ex) {
-            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
-            errbox(this, "Error updating Trackers(API). Check your internet connection and Please contact TechTac");
-        } finally {
-            //this.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
-            endOL();
-            lblStatus2.setVisible(false);
-            jSeparator2.setVisible(false);
+    private void showSeedsPanel(){
+        lblPeers.setText("Updating..");
+        lblSeeds.setText("Updating..");
+        lblPeers.setVisible(true);
+        lblPeersIcon.setVisible(true);
+        lblPeersLoading.setVisible(true);
+        lblSeeds.setVisible(true);
+        lblSeedsIcon.setVisible(true);
+        lblSeedsLoading.setVisible(true);
+        lblSPPanelTitle.setVisible(true);
+    }
+    
+    private void hideSeedsPanel(){
+        lblPeers.setVisible(false);
+        lblPeersIcon.setVisible(false);
+        lblPeersLoading.setVisible(false);
+        lblSeeds.setVisible(false);
+        lblSeedsIcon.setVisible(false);
+        lblSeedsLoading.setVisible(false);
+        lblSPPanelTitle.setVisible(false);
+        lblPeers.setText("Updating..");
+        lblSeeds.setText("Updating..");
+    }
+    
+    private void startSeedCounter() {
+        if (scraping){
+            seedCounter.cancel(true);
+            while(scraping){
+               //WAIT 
+            }  
+            showSeedsPanel();
+            getSeeds();
+        } else {
+            showSeedsPanel();
+            getSeeds();
         }
     }
     
+    private void getSeeds() {
+        scraping = true;
+        seedCounter = new SwingWorker<Void, Void>() {
+            
+            long seeds_tot = 0;
+            long peers_tot = 0;
+
+            @Override
+            protected Void doInBackground() throws Exception {
+                ArrayList<Map.Entry<String, String>> trcks = DBConn.loadAllTrackers();
+
+                //String b64hash = (String) tblTorrents.getModel().getValueAt(tblTorrents.getSelectedRow(), 1);
+                String b64hash = ((TableObj) tblTorrents.getValueAt(tblTorrents.getSelectedRow(), 1)).hash;
+                byte[] decoded = Base64.decodeBase64(b64hash);
+
+                for (Map.Entry<String, String> curr : trcks) {
+                    if (!scraping) {
+                        return null;
+                    } else {
+                        if(seedCounter == this){
+                        LiveTracker track = new LiveTracker(curr.getKey(), curr.getValue(), decoded, 3);
+
+                        boolean success = false;
+
+                        try {
+                            //System.out.println(curr.getKey());
+                            success = track.scrapeTracker();
+                        } catch (Exception e) {
+                            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, e);
+                            sendNtf("Having trouble updating Seeds/Peers with some Trackers", "warn");
+                        }
+
+                        if (success) {
+                            //System.out.println(success);
+                            //System.out.println("Seeds - " + track.getSeeds());
+                            //System.out.println("Peers - " + track.getPeers());
+                            seeds_tot = seeds_tot + track.getSeeds();
+                            peers_tot = peers_tot + track.getPeers();
+                            publish();
+                        }
+                        } else {
+                            return null;
+                        }
+                    }
+                    //System.out.print(curr.getKey() + "    ");
+                    //System.out.println(curr.getValue());
+                }
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            @Override
+            protected void done() {
+                //System.err.println("FINISHED");
+                scraping = false;
+                lblPeersLoading.setVisible(false);
+                lblSeedsLoading.setVisible(false);
+ 
+                if (lblPeers.getText().equals("Updating..")) {
+                    if (!this.isCancelled()) {
+                        hideSeedsPanel();
+                        sendNtf("Unable to update Seeds/Peers. Please check your internet connection", "err");
+                    }
+                }
+            }
+
+            @Override
+            protected void process(List<Void> chunks) {
+                lblSeeds.setText(Long.toString(seeds_tot));
+                lblPeers.setText(Long.toString(peers_tot));
+            }
+        };
+        seedCounter.execute();
+
+    }
+    
+    private void updTrackers() {
+        
+        FrmMain main = this;
+
+        SwingWorker<Void, Void> backgroundProcess;
+        backgroundProcess = new SwingWorker<Void, Void>() {
+
+            boolean success = false;
+
+            @Override
+            protected Void doInBackground() throws Exception {
+
+                try {
+                    //this.setCursor(new Cursor(Cursor.WAIT_CURSOR));
+                    startOL("Updating Trackers..");
+                    String url = "https://newtrackon.com/api/stable";
+
+                    URL url_obj = new URL(url);
+                    HttpURLConnection con = (HttpURLConnection) url_obj.openConnection();
+
+                    con.setRequestMethod("GET");
+                    con.setRequestProperty("User-Agent", USER_AGENT);
+
+                    BufferedReader in = new BufferedReader(new InputStreamReader(con.getInputStream(), StandardCharsets.UTF_8));
+                    String inputLine;
+                    StringBuffer response = new StringBuffer();
+
+                    while ((inputLine = in.readLine()) != null) {
+                        if (!inputLine.isEmpty()) {
+                            //System.out.print(inputLine);
+                            response.append(inputLine + " ");
+                            //System.out.println(c++);
+                        }
+
+                    }
+                    in.close();
+
+                    String[] lines = response.toString().split(" ");
+                    success = DBConn.updateTrackers(lines, main);
+
+                    //System.out.println(lines[0]);
+                    //System.out.println(response);
+                } catch (MalformedURLException ex) {
+                    Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
+                    success = false;
+                    //errbox(main, "Error updating Trackers(API). Check your internet connection and Please contact TechTac");
+                } catch (IOException ex) {
+                    Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
+                    success = false;
+                    //errbox(main, "Error updating Trackers(API). Check your internet connection and Please contact TechTac");
+                } finally {
+                    //this.setCursor(new Cursor(Cursor.DEFAULT_CURSOR));
+                    endOL();
+                    lblStatus2.setVisible(false);
+                    jSeparator2.setVisible(false);
+                }
+                throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+            }
+
+            @Override
+            protected void done() {
+                if (success) {
+                    sendNtf("Trackers updated successfully", "scs");
+                    //msgbox(this, "Trackers updated successfully");
+                } else {
+                    sendNtf("Error updating Trackers. Please check your internet connection and contact TechTac", "err");
+                    //errbox(main, "Error updating Trackers(DB). Please contact TechTac");
+                }
+            }
+        };
+        backgroundProcess.execute();
+
+    }
+
 
     /**
      * This method is called from within the constructor to initialize the form.
@@ -560,7 +696,13 @@ public class FrmMain extends javax.swing.JFrame {
         txtFilter = new javax.swing.JTextField();
         btnCpyMag = new javax.swing.JButton();
         btnSvFile = new javax.swing.JButton();
-        btnSvFile1 = new javax.swing.JButton();
+        lblSPPanelTitle = new javax.swing.JLabel();
+        lblPeersLoading = new javax.swing.JLabel();
+        lblPeersIcon = new javax.swing.JLabel();
+        lblPeers = new javax.swing.JLabel();
+        lblSeedsLoading = new javax.swing.JLabel();
+        lblSeeds = new javax.swing.JLabel();
+        lblSeedsIcon = new javax.swing.JLabel();
         jPanel1 = new javax.swing.JPanel();
         lblStatus = new javax.swing.JLabel();
         jSeparator1 = new javax.swing.JSeparator();
@@ -592,7 +734,7 @@ public class FrmMain extends javax.swing.JFrame {
         pnlMain.setLayout(new java.awt.GridBagLayout());
 
         txtSearch.setFont(new java.awt.Font("Dialog", 0, 14)); // NOI18N
-        txtSearch.setText("\"bright\"");
+        txtSearch.setText("big bang theory");
         txtSearch.addKeyListener(new java.awt.event.KeyAdapter() {
             public void keyTyped(java.awt.event.KeyEvent evt) {
                 txtSearchKeyTyped(evt);
@@ -618,6 +760,7 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
         gridBagConstraints.gridy = 1;
+        gridBagConstraints.gridwidth = 3;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.ipadx = 55;
         gridBagConstraints.ipady = 13;
@@ -646,6 +789,13 @@ public class FrmMain extends javax.swing.JFrame {
         tblTorrents.setRowHeight(27);
         tblTorrents.getSelectionModel().addListSelectionListener(new ListSelectionListener(){
             public void valueChanged(ListSelectionEvent event) {
+                hideSeedsPanel();
+                if (scraping){
+                    seedCounter.cancel(true);
+                    while(scraping){
+                        //WAIT
+                    }
+                }
                 if(tblTorrents.getSelectedRow() != -1){
                     btnOpenMag.setEnabled(true);
                     btnCpyMag.setEnabled(true);
@@ -668,7 +818,7 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 5;
         gridBagConstraints.gridwidth = 2;
-        gridBagConstraints.gridheight = 6;
+        gridBagConstraints.gridheight = 10;
         gridBagConstraints.fill = java.awt.GridBagConstraints.BOTH;
         gridBagConstraints.weighty = 0.1;
         gridBagConstraints.insets = new java.awt.Insets(17, 12, 13, 12);
@@ -684,7 +834,8 @@ public class FrmMain extends javax.swing.JFrame {
         });
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 10;
+        gridBagConstraints.gridy = 14;
+        gridBagConstraints.gridwidth = 3;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.PAGE_END;
         gridBagConstraints.insets = new java.awt.Insets(0, 0, 13, 10);
         pnlMain.add(jLabel2, gridBagConstraints);
@@ -693,7 +844,8 @@ public class FrmMain extends javax.swing.JFrame {
         jLabel1.setText("By");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 9;
+        gridBagConstraints.gridy = 13;
+        gridBagConstraints.gridwidth = 3;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.PAGE_END;
         gridBagConstraints.weighty = 1.0;
         gridBagConstraints.insets = new java.awt.Insets(11, 0, 8, 10);
@@ -710,6 +862,7 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
         gridBagConstraints.gridy = 7;
+        gridBagConstraints.gridwidth = 3;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.ipadx = 55;
         gridBagConstraints.ipady = 13;
@@ -728,6 +881,7 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
         gridBagConstraints.gridy = 5;
+        gridBagConstraints.gridwidth = 3;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.ipadx = 55;
         gridBagConstraints.ipady = 13;
@@ -774,7 +928,7 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
         gridBagConstraints.gridy = 3;
-        gridBagConstraints.gridwidth = 4;
+        gridBagConstraints.gridwidth = 6;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.insets = new java.awt.Insets(2, 12, 0, 12);
         pnlMain.add(jPanel2, gridBagConstraints);
@@ -790,6 +944,7 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
         gridBagConstraints.gridy = 6;
+        gridBagConstraints.gridwidth = 3;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.ipadx = 55;
         gridBagConstraints.ipady = 13;
@@ -807,6 +962,7 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
         gridBagConstraints.gridy = 8;
+        gridBagConstraints.gridwidth = 3;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.ipadx = 55;
         gridBagConstraints.ipady = 13;
@@ -814,22 +970,65 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints.insets = new java.awt.Insets(3, 0, 0, 12);
         pnlMain.add(btnSvFile, gridBagConstraints);
 
-        btnSvFile1.setIcon(new javax.swing.ImageIcon(getClass().getResource("/main/res/save.png"))); // NOI18N
-        btnSvFile1.setText("Save to File");
-        btnSvFile1.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnSvFile1ActionPerformed(evt);
-            }
-        });
+        lblSPPanelTitle.setText("Seeds/Peers");
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 9;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.ipadx = 55;
-        gridBagConstraints.ipady = 13;
+        gridBagConstraints.gridy = 10;
+        gridBagConstraints.gridwidth = 3;
+        gridBagConstraints.insets = new java.awt.Insets(17, 0, 0, 0);
+        pnlMain.add(lblSPPanelTitle, gridBagConstraints);
+
+        lblPeersLoading.setIcon(new javax.swing.ImageIcon(getClass().getResource("/main/res/updating.gif"))); // NOI18N
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 5;
+        gridBagConstraints.gridy = 12;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.LINE_START;
+        gridBagConstraints.insets = new java.awt.Insets(9, 11, 0, 12);
+        pnlMain.add(lblPeersLoading, gridBagConstraints);
+
+        lblPeersIcon.setIcon(new javax.swing.ImageIcon(getClass().getResource("/main/res/users.png"))); // NOI18N
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 3;
+        gridBagConstraints.gridy = 12;
         gridBagConstraints.anchor = java.awt.GridBagConstraints.PAGE_START;
-        gridBagConstraints.insets = new java.awt.Insets(3, 0, 0, 12);
-        pnlMain.add(btnSvFile1, gridBagConstraints);
+        gridBagConstraints.insets = new java.awt.Insets(12, 8, 0, 0);
+        pnlMain.add(lblPeersIcon, gridBagConstraints);
+
+        lblPeers.setFont(new java.awt.Font("Dialog", 1, 14)); // NOI18N
+        lblPeers.setText("Updating..");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 4;
+        gridBagConstraints.gridy = 12;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.PAGE_START;
+        gridBagConstraints.insets = new java.awt.Insets(10, 10, 0, 0);
+        pnlMain.add(lblPeers, gridBagConstraints);
+
+        lblSeedsLoading.setIcon(new javax.swing.ImageIcon(getClass().getResource("/main/res/updating.gif"))); // NOI18N
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 5;
+        gridBagConstraints.gridy = 11;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.LINE_START;
+        gridBagConstraints.insets = new java.awt.Insets(9, 11, 0, 12);
+        pnlMain.add(lblSeedsLoading, gridBagConstraints);
+
+        lblSeeds.setFont(new java.awt.Font("Dialog", 1, 14)); // NOI18N
+        lblSeeds.setText("Updating..");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 4;
+        gridBagConstraints.gridy = 11;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.PAGE_START;
+        gridBagConstraints.insets = new java.awt.Insets(10, 10, 0, 0);
+        pnlMain.add(lblSeeds, gridBagConstraints);
+
+        lblSeedsIcon.setIcon(new javax.swing.ImageIcon(getClass().getResource("/main/res/user.png"))); // NOI18N
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 3;
+        gridBagConstraints.gridy = 11;
+        gridBagConstraints.anchor = java.awt.GridBagConstraints.PAGE_START;
+        gridBagConstraints.insets = new java.awt.Insets(12, 8, 0, 0);
+        pnlMain.add(lblSeedsIcon, gridBagConstraints);
 
         getContentPane().add(pnlMain, java.awt.BorderLayout.CENTER);
 
@@ -1015,23 +1214,13 @@ public class FrmMain extends javax.swing.JFrame {
     }//GEN-LAST:event_formComponentMoved
 
     private void btnSvFileActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSvFileActionPerformed
-        startLoading();
-    }//GEN-LAST:event_btnSvFileActionPerformed
-
-    private void btnSvFile1ActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSvFile1ActionPerformed
+        startSeedCounter();
         sendNtf("Notification test", "scs");
-    }//GEN-LAST:event_btnSvFile1ActionPerformed
+    }//GEN-LAST:event_btnSvFileActionPerformed
 
     private void tblTorrentsMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tblTorrentsMouseClicked
         if (evt.getClickCount() == 2) {
-            try {
-                Desktop.getDesktop().browse(new URI(getMagnet()));
-                sendNtf("Opening Magnet link in default Torrent Client..", null);
-            } catch (IOException ex) {
-                Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
-            } catch (URISyntaxException ex) {
-                Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
-            }
+            startSeedCounter();
         }
     }//GEN-LAST:event_tblTorrentsMouseClicked
 
@@ -1102,14 +1291,28 @@ public class FrmMain extends javax.swing.JFrame {
             }
         });
     }
+    
+    class TableObj  {
+        public String name;
+        public String hash;
+        
+        public TableObj(String nm, String b64){
+            name = nm;
+            hash = b64;
+        }
 
+        @Override
+        public String toString() {
+            return name; //To change body of generated methods, choose Tools | Templates.
+        }
+    }
+        
     // Variables declaration - do not modify//GEN-BEGIN:variables
     protected javax.swing.JButton btnCpyHash;
     protected javax.swing.JButton btnCpyMag;
     protected javax.swing.JButton btnOpenMag;
     protected javax.swing.JButton btnSearch;
     protected javax.swing.JButton btnSvFile;
-    protected javax.swing.JButton btnSvFile1;
     protected javax.swing.JCheckBox chkSS;
     protected javax.swing.Box.Filler filler1;
     protected javax.swing.JLabel jLabel1;
@@ -1121,6 +1324,13 @@ public class FrmMain extends javax.swing.JFrame {
     protected javax.swing.JScrollPane jScrollPane1;
     protected javax.swing.JSeparator jSeparator1;
     protected javax.swing.JSeparator jSeparator2;
+    protected javax.swing.JLabel lblPeers;
+    protected javax.swing.JLabel lblPeersIcon;
+    protected javax.swing.JLabel lblPeersLoading;
+    protected javax.swing.JLabel lblSPPanelTitle;
+    protected javax.swing.JLabel lblSeeds;
+    protected javax.swing.JLabel lblSeedsIcon;
+    protected javax.swing.JLabel lblSeedsLoading;
     protected javax.swing.JLabel lblStatus;
     protected javax.swing.JLabel lblStatus2;
     protected javax.swing.JMenuItem mnuImport;

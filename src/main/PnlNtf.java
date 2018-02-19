@@ -7,11 +7,14 @@ package main;
 
 import java.awt.AlphaComposite;
 import java.awt.Color;
+import java.awt.Component;
 import java.awt.Graphics;
 import java.awt.Graphics2D;
 import java.awt.GridBagConstraints;
+import java.awt.Point;
 import java.awt.RenderingHints;
 import javax.swing.JLabel;
+import javax.swing.SwingUtilities;
 
 /**
  *
@@ -24,6 +27,22 @@ public class PnlNtf extends javax.swing.JPanel {
     /**
      * Creates new form OLPanel
      */
+    @Override
+    public boolean contains(int x, int y) {
+        Component[] components = getComponents();
+        for (int i = 0; i < components.length; i++) {
+            Component component = components[i];
+            Point containerPoint = SwingUtilities.convertPoint(
+                    this,
+                    x, y,
+                    component);
+            if (component.contains(containerPoint)) {
+                return true;
+            }
+        }
+        return false;
+    }
+            
     public PnlNtf() {
         initComponents();
         jLabel2.setVisible(false);

@@ -11,8 +11,13 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Hashtable;
+import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
 import javax.swing.JComboBox;
 import javax.swing.JOptionPane;
 
@@ -211,6 +216,45 @@ public class DBConn {
             System.err.println(e.getClass().getName() + ": " + e.getMessage());
             errbox(parent, "Error loading Trackers. Please contact TechTac");
             //System.exit(0);
+        }
+
+        System.out.println("loadTrackers done successfully");
+        
+        return trcks;
+        
+    }
+    
+    public static ArrayList<Entry<String,String>> loadAllTrackers() {
+        Connection c = null;
+        Statement stmt = null;
+        ArrayList<Entry<String,String>> trcks = new ArrayList<Entry<String,String>>();
+        
+        try {
+            Class.forName("org.sqlite.JDBC");
+            c = DriverManager.getConnection("jdbc:sqlite:config");
+            c.setAutoCommit(false);
+            System.out.println("loadTrackers opened database successfully");
+
+            stmt = c.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT * FROM `trackers` WHERE trcks LIKE 'udp://%';");
+
+            while (rs.next()) {
+                trcks.add(new AbstractMap.SimpleEntry<>(rs.getString("trcks"),"udp"));
+            }
+            
+            rs = stmt.executeQuery("SELECT * FROM `trackers` WHERE trcks LIKE 'http://%' OR trcks LIKE 'https://%';");
+
+            while (rs.next()) {
+                trcks.add(new AbstractMap.SimpleEntry<>(rs.getString("trcks"),"http"));
+            }
+            
+            Collections.shuffle(trcks);
+            
+            rs.close();
+            stmt.close();
+            c.close();
+        } catch (Exception e) {
+            System.err.println(e.getClass().getName() + ": " + e.getMessage());
         }
 
         System.out.println("loadTrackers done successfully");
