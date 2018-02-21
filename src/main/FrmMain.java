@@ -213,7 +213,7 @@ public class FrmMain extends javax.swing.JFrame {
         }
     }
 
-    private void sendNtf(String msg, String mode) {
+    public void sendNtf(String msg, String mode) {
 
         SwingWorker<Void, Void> backgroundProcess;
         backgroundProcess = new SwingWorker<Void, Void>() {
@@ -725,6 +725,7 @@ public class FrmMain extends javax.swing.JFrame {
         mnuTools = new javax.swing.JMenu();
         mnuImport = new javax.swing.JMenuItem();
         mnuUpdTrackers = new javax.swing.JMenuItem();
+        mnuTrackers = new javax.swing.JMenuItem();
         mnuHelp = new javax.swing.JMenu();
         mnuContact = new javax.swing.JMenuItem();
         mnuAbout = new javax.swing.JMenuItem();
@@ -1120,6 +1121,15 @@ public class FrmMain extends javax.swing.JFrame {
         });
         mnuTools.add(mnuUpdTrackers);
 
+        mnuTrackers.setAccelerator(javax.swing.KeyStroke.getKeyStroke(java.awt.event.KeyEvent.VK_T, java.awt.event.InputEvent.CTRL_MASK));
+        mnuTrackers.setText("Show all Trackers");
+        mnuTrackers.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                mnuTrackersActionPerformed(evt);
+            }
+        });
+        mnuTools.add(mnuTrackers);
+
         jMenuBar1.add(mnuTools);
 
         mnuHelp.setText("Help");
@@ -1385,6 +1395,11 @@ public class FrmMain extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_txtRsCountKeyTyped
 
+    private void mnuTrackersActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_mnuTrackersActionPerformed
+        DlgTrackers dlg = new DlgTrackers(this, true);
+        dlg.setVisible(true);
+    }//GEN-LAST:event_mnuTrackersActionPerformed
+
     /**
      * @param args the command line arguments
      */
@@ -1459,6 +1474,7 @@ public class FrmMain extends javax.swing.JFrame {
     protected javax.swing.JMenu mnuHelp;
     protected javax.swing.JMenuItem mnuImport;
     protected javax.swing.JMenu mnuTools;
+    protected javax.swing.JMenuItem mnuTrackers;
     protected javax.swing.JMenuItem mnuUpdTrackers;
     protected javax.swing.JPanel pnlMain;
     protected javax.swing.JTable tblTorrents;

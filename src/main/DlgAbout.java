@@ -13,7 +13,7 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 /**
  *
- * @author MAhezh
+ * @author TechTac
  */
 public class DlgAbout extends javax.swing.JDialog {
 
