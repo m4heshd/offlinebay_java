@@ -78,6 +78,7 @@ import techtac.LiveTracker;
  */
 public class FrmMain extends javax.swing.JFrame {
     
+    private boolean start = true;
     private final String USER_AGENT = "Mozilla/5.0";
     public int display = 0;
     public int wstate = 6;
@@ -103,6 +104,7 @@ public class FrmMain extends javax.swing.JFrame {
     private Thread not = new Thread();
     private SwingWorker<Void, Void> seedCounter;
     private volatile boolean scraping = false;
+    private volatile int rs_count = 10000;
     
 
     /**
@@ -111,13 +113,17 @@ public class FrmMain extends javax.swing.JFrame {
     public FrmMain() {
         display = DBConn.getDpl();
         wstate = DBConn.getState();
+        rs_count = DBConn.getRsCount();
         
         initComponents();
+        this.setIconImage(Toolkit.getDefaultToolkit().getImage(getClass().getResource("/main/res/icon_32.png")));
         glassPane.setOpaque(false);
         lblStatus2.setVisible(false);
         jSeparator2.setVisible(false);
         hideSeedsPanel();
         tblTorrents.setAutoCreateRowSorter(true);
+        txtRsCount.setTransferHandler(null);
+        txtRsCount.setText(Integer.toString(rs_count));
         
         showOnScreen(display, this);
         setVisible(true);
@@ -276,7 +282,7 @@ public class FrmMain extends javax.swing.JFrame {
     }
     
     private void search(String qry){
-        
+        txtFilter.setText("");
         //qry = qry.replace("\"", "\"\"");
         qry = qry.replaceAll("'", "''");
         qry = qry.trim();
@@ -311,8 +317,14 @@ public class FrmMain extends javax.swing.JFrame {
             Class.forName("org.relique.jdbc.csv.CsvDriver");
             Connection conn = DriverManager.getConnection("jdbc:relique:csv:" + System.getProperty("user.dir"), props);
             Statement stmt = conn.createStatement();
+            ResultSet results = null;
             //ResultSet results = stmt.executeQuery("SELECT * FROM dump WHERE \"#ADDED\"='2011-Sep-08 05:09:05';");
-            ResultSet results = stmt.executeQuery("SELECT * FROM dump WHERE " + ready + " LIMIT 10000;");
+            if(start){
+                results = stmt.executeQuery("SELECT * FROM dump LIMIT 100;");
+            }else{
+                results = stmt.executeQuery("SELECT * FROM dump WHERE " + ready + " LIMIT " + rs_count + ";");
+            }
+            
             
             tblTorrents.setModel(DbUtils.resultSetToTableModel(results));
             tblTorrents.getColumnModel().removeColumn(tblTorrents.getColumnModel().getColumn(1));
@@ -467,7 +479,7 @@ public class FrmMain extends javax.swing.JFrame {
         }
         String ready = withName + DBConn.loadTrackers(this);
         
-        System.out.println(ready);
+        //System.out.println(ready);
         return ready;
     }
     
@@ -694,8 +706,9 @@ public class FrmMain extends javax.swing.JFrame {
         filler1 = new javax.swing.Box.Filler(new java.awt.Dimension(0, 0), new java.awt.Dimension(0, 0), new java.awt.Dimension(32767, 0));
         jLabel4 = new javax.swing.JLabel();
         txtFilter = new javax.swing.JTextField();
+        txtRsCount = new javax.swing.JTextField();
+        jLabel5 = new javax.swing.JLabel();
         btnCpyMag = new javax.swing.JButton();
-        btnSvFile = new javax.swing.JButton();
         lblSPPanelTitle = new javax.swing.JLabel();
         lblPeersLoading = new javax.swing.JLabel();
         lblPeersIcon = new javax.swing.JLabel();
@@ -712,12 +725,18 @@ public class FrmMain extends javax.swing.JFrame {
         mnuTools = new javax.swing.JMenu();
         mnuImport = new javax.swing.JMenuItem();
         mnuUpdTrackers = new javax.swing.JMenuItem();
+        mnuHelp = new javax.swing.JMenu();
+        mnuContact = new javax.swing.JMenuItem();
+        mnuAbout = new javax.swing.JMenuItem();
 
         setDefaultCloseOperation(javax.swing.WindowConstants.EXIT_ON_CLOSE);
         setTitle("OfflineBay by TechTac");
         addComponentListener(new java.awt.event.ComponentAdapter() {
             public void componentMoved(java.awt.event.ComponentEvent evt) {
                 formComponentMoved(evt);
+            }
+            public void componentShown(java.awt.event.ComponentEvent evt) {
+                formComponentShown(evt);
             }
         });
         addWindowStateListener(new java.awt.event.WindowStateListener() {
@@ -812,6 +831,11 @@ public class FrmMain extends javax.swing.JFrame {
                 tblTorrentsMouseClicked(evt);
             }
         });
+        tblTorrents.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyTyped(java.awt.event.KeyEvent evt) {
+                tblTorrentsKeyTyped(evt);
+            }
+        });
         jScrollPane1.setViewportView(tblTorrents);
 
         gridBagConstraints = new java.awt.GridBagConstraints();
@@ -898,7 +922,7 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints.anchor = java.awt.GridBagConstraints.LINE_START;
         jPanel2.add(chkSS, gridBagConstraints);
         gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 4;
+        gridBagConstraints.gridx = 7;
         gridBagConstraints.gridy = 0;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.weightx = 1.0;
@@ -906,7 +930,7 @@ public class FrmMain extends javax.swing.JFrame {
 
         jLabel4.setText("Filter:");
         gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridx = 3;
         gridBagConstraints.gridy = 0;
         gridBagConstraints.insets = new java.awt.Insets(0, 9, 0, 0);
         jPanel2.add(jLabel4, gridBagConstraints);
@@ -917,13 +941,38 @@ public class FrmMain extends javax.swing.JFrame {
             }
         });
         gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 2;
+        gridBagConstraints.gridx = 4;
         gridBagConstraints.gridy = 0;
         gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
         gridBagConstraints.ipady = 10;
         gridBagConstraints.weightx = 0.2;
         gridBagConstraints.insets = new java.awt.Insets(0, 3, 0, 0);
         jPanel2.add(txtFilter, gridBagConstraints);
+
+        txtRsCount.setText("10000");
+        txtRsCount.addKeyListener(new java.awt.event.KeyAdapter() {
+            public void keyReleased(java.awt.event.KeyEvent evt) {
+                txtRsCountKeyReleased(evt);
+            }
+            public void keyTyped(java.awt.event.KeyEvent evt) {
+                txtRsCountKeyTyped(evt);
+            }
+        });
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 2;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
+        gridBagConstraints.ipady = 10;
+        gridBagConstraints.weightx = 0.2;
+        gridBagConstraints.insets = new java.awt.Insets(0, 3, 0, 0);
+        jPanel2.add(txtRsCount, gridBagConstraints);
+
+        jLabel5.setText("Max. Results:");
+        gridBagConstraints = new java.awt.GridBagConstraints();
+        gridBagConstraints.gridx = 1;
+        gridBagConstraints.gridy = 0;
+        gridBagConstraints.insets = new java.awt.Insets(0, 19, 0, 0);
+        jPanel2.add(jLabel5, gridBagConstraints);
 
         gridBagConstraints = new java.awt.GridBagConstraints();
         gridBagConstraints.gridx = 0;
@@ -951,24 +1000,6 @@ public class FrmMain extends javax.swing.JFrame {
         gridBagConstraints.anchor = java.awt.GridBagConstraints.PAGE_START;
         gridBagConstraints.insets = new java.awt.Insets(3, 0, 0, 12);
         pnlMain.add(btnCpyMag, gridBagConstraints);
-
-        btnSvFile.setIcon(new javax.swing.ImageIcon(getClass().getResource("/main/res/save.png"))); // NOI18N
-        btnSvFile.setText("Save to File");
-        btnSvFile.addActionListener(new java.awt.event.ActionListener() {
-            public void actionPerformed(java.awt.event.ActionEvent evt) {
-                btnSvFileActionPerformed(evt);
-            }
-        });
-        gridBagConstraints = new java.awt.GridBagConstraints();
-        gridBagConstraints.gridx = 3;
-        gridBagConstraints.gridy = 8;
-        gridBagConstraints.gridwidth = 3;
-        gridBagConstraints.fill = java.awt.GridBagConstraints.HORIZONTAL;
-        gridBagConstraints.ipadx = 55;
-        gridBagConstraints.ipady = 13;
-        gridBagConstraints.anchor = java.awt.GridBagConstraints.PAGE_START;
-        gridBagConstraints.insets = new java.awt.Insets(3, 0, 0, 12);
-        pnlMain.add(btnSvFile, gridBagConstraints);
 
         lblSPPanelTitle.setText("Seeds/Peers");
         gridBagConstraints = new java.awt.GridBagConstraints();
@@ -1090,6 +1121,26 @@ public class FrmMain extends javax.swing.JFrame {
         mnuTools.add(mnuUpdTrackers);
 
         jMenuBar1.add(mnuTools);
+
+        mnuHelp.setText("Help");
+
+        mnuContact.setText("Contact TechTac");
+        mnuContact.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                mnuContactActionPerformed(evt);
+            }
+        });
+        mnuHelp.add(mnuContact);
+
+        mnuAbout.setText("About");
+        mnuAbout.addActionListener(new java.awt.event.ActionListener() {
+            public void actionPerformed(java.awt.event.ActionEvent evt) {
+                mnuAboutActionPerformed(evt);
+            }
+        });
+        mnuHelp.add(mnuAbout);
+
+        jMenuBar1.add(mnuHelp);
 
         setJMenuBar(jMenuBar1);
 
@@ -1213,11 +1264,6 @@ public class FrmMain extends javax.swing.JFrame {
         }
     }//GEN-LAST:event_formComponentMoved
 
-    private void btnSvFileActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_btnSvFileActionPerformed
-        startSeedCounter();
-        sendNtf("Notification test", "scs");
-    }//GEN-LAST:event_btnSvFileActionPerformed
-
     private void tblTorrentsMouseClicked(java.awt.event.MouseEvent evt) {//GEN-FIRST:event_tblTorrentsMouseClicked
         if (evt.getClickCount() == 2) {
             startSeedCounter();
@@ -1263,6 +1309,81 @@ public class FrmMain extends javax.swing.JFrame {
             sendNtf("Importing cancelled by User..", null);
         }
     }//GEN-LAST:event_mnuImportActionPerformed
+
+    private void mnuAboutActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_mnuAboutActionPerformed
+        DlgAbout dlg = new DlgAbout(this, true);
+        dlg.setVisible(true);
+    }//GEN-LAST:event_mnuAboutActionPerformed
+
+    private void mnuContactActionPerformed(java.awt.event.ActionEvent evt) {//GEN-FIRST:event_mnuContactActionPerformed
+        try {
+            Desktop.getDesktop().browse(new URI("https://www.youtube.com/c/techtac?sub_confirmation=1"));
+        } catch (IOException ex) {
+            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
+        } catch (URISyntaxException ex) {
+            Logger.getLogger(FrmMain.class.getName()).log(Level.SEVERE, null, ex);
+        }
+    }//GEN-LAST:event_mnuContactActionPerformed
+
+    private void formComponentShown(java.awt.event.ComponentEvent evt) {//GEN-FIRST:event_formComponentShown
+        if (start) {
+            lblStatus.setForeground(Color.white);
+            lblStatus.setText("Searching....");
+
+            SwingWorker<Void, Void> backgroundProcess;
+            backgroundProcess = new SwingWorker<Void, Void>() {
+
+                @Override
+                protected Void doInBackground() throws Exception {
+                    search(txtSearch.getText());
+                    throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+                }
+
+                @Override
+                protected void done() {
+                    start = false;
+                }
+            };
+            backgroundProcess.execute();
+        }
+    }//GEN-LAST:event_formComponentShown
+
+    private void tblTorrentsKeyTyped(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_tblTorrentsKeyTyped
+        char c = evt.getKeyChar();
+        if (Character.isLetter(c)) {
+            txtFilter.requestFocusInWindow();
+            txtFilter.setText(Character.toString(c));
+        }
+    }//GEN-LAST:event_tblTorrentsKeyTyped
+
+    private void txtRsCountKeyReleased(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtRsCountKeyReleased
+        if (!txtRsCount.getText().trim().equals("")) {
+            int count = Integer.parseInt(txtRsCount.getText());
+            if (count > 10000 || count == 0) {
+                rs_count = 10000;
+                txtRsCount.setText("10000");
+            } else {
+                char c = evt.getKeyChar();
+                if (Character.isDigit(c)) {
+                    rs_count = count;
+                    DBConn.setRsCount(count);
+                }
+            }
+        } else {
+            txtRsCount.setText(Integer.toString(rs_count));
+        }
+
+    }//GEN-LAST:event_txtRsCountKeyReleased
+
+    private void txtRsCountKeyTyped(java.awt.event.KeyEvent evt) {//GEN-FIRST:event_txtRsCountKeyTyped
+        char c = evt.getKeyChar();
+        if (!Character.isDigit(c)) {
+            if (c != KeyEvent.VK_BACK_SPACE) {
+                evt.consume();
+                java.awt.Toolkit.getDefaultToolkit().beep();
+            }
+        }
+    }//GEN-LAST:event_txtRsCountKeyTyped
 
     /**
      * @param args the command line arguments
@@ -1312,12 +1433,12 @@ public class FrmMain extends javax.swing.JFrame {
     protected javax.swing.JButton btnCpyMag;
     protected javax.swing.JButton btnOpenMag;
     protected javax.swing.JButton btnSearch;
-    protected javax.swing.JButton btnSvFile;
     protected javax.swing.JCheckBox chkSS;
     protected javax.swing.Box.Filler filler1;
     protected javax.swing.JLabel jLabel1;
     protected javax.swing.JLabel jLabel2;
     protected javax.swing.JLabel jLabel4;
+    protected javax.swing.JLabel jLabel5;
     protected javax.swing.JMenuBar jMenuBar1;
     protected javax.swing.JPanel jPanel1;
     protected javax.swing.JPanel jPanel2;
@@ -1333,12 +1454,16 @@ public class FrmMain extends javax.swing.JFrame {
     protected javax.swing.JLabel lblSeedsLoading;
     protected javax.swing.JLabel lblStatus;
     protected javax.swing.JLabel lblStatus2;
+    protected javax.swing.JMenuItem mnuAbout;
+    protected javax.swing.JMenuItem mnuContact;
+    protected javax.swing.JMenu mnuHelp;
     protected javax.swing.JMenuItem mnuImport;
     protected javax.swing.JMenu mnuTools;
     protected javax.swing.JMenuItem mnuUpdTrackers;
     protected javax.swing.JPanel pnlMain;
     protected javax.swing.JTable tblTorrents;
     protected javax.swing.JTextField txtFilter;
+    protected javax.swing.JTextField txtRsCount;
     protected javax.swing.JTextField txtSearch;
     // End of variables declaration//GEN-END:variables
 }

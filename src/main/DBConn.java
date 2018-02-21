@@ -85,6 +85,40 @@ public class DBConn {
         updateSQLite("UPDATE `app_sets` SET display = " + dpl + "");
     }
     
+    public static void setRsCount(int count) {
+        updateSQLite("UPDATE `app_sets` SET rs_count = " + count + "");
+    }
+    
+    public static int getRsCount() {
+        Connection c = null;
+        Statement stmt = null;
+        int wstate = 0;
+        try {
+            Class.forName("org.sqlite.JDBC");
+            c = DriverManager.getConnection("jdbc:sqlite:config");
+            c.setAutoCommit(false);
+            System.out.println("getRsCount opened database successfully");
+
+            stmt = c.createStatement();
+            ResultSet rs = stmt.executeQuery("SELECT rs_count FROM `app_sets`;");
+            
+            while(rs.next()){
+                wstate = rs.getInt("rs_count");
+            }
+            
+            rs.close();
+            stmt.close();
+            c.close();
+        } catch (Exception e) {
+            System.err.println(e.getClass().getName() + ": " + e.getMessage());
+            //System.exit(0);
+        }
+
+        System.out.println("getRsCount done successfully");
+        
+        return wstate;
+    }
+    
     public static int getState() {
         Connection c = null;
         Statement stmt = null;
