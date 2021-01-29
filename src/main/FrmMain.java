@@ -116,7 +116,7 @@ public class FrmMain extends javax.swing.JFrame {
         rs_count = DBConn.getRsCount();
         
         initComponents();
-        this.setIconImage(Toolkit.getDefaultToolkit().getImage(getClass().getResource("/main/res/icon_32.png")));
+        this.setIconImage(Toolkit.getDefaultToolkit().getImage(getClass().getResource("/main/res/icon_64.png")));
         glassPane.setOpaque(false);
         lblStatus2.setVisible(false);
         jSeparator2.setVisible(false);
@@ -754,7 +754,6 @@ public class FrmMain extends javax.swing.JFrame {
         pnlMain.setLayout(new java.awt.GridBagLayout());
 
         txtSearch.setFont(new java.awt.Font("Dialog", 0, 14)); // NOI18N
-        txtSearch.setText("big bang theory");
         txtSearch.addKeyListener(new java.awt.event.KeyAdapter() {
             public void keyTyped(java.awt.event.KeyEvent evt) {
                 txtSearchKeyTyped(evt);
